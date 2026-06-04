@@ -9,6 +9,7 @@ import {
   Twitter,
   Upload,
 } from "lucide-react";
+import { ConnectWalletButton } from "./ConnectWalletButton";
 
 type NavProps = {
   active?: "marketplace" | "upload" | "library";
@@ -48,9 +49,7 @@ export function Header({ active, landing = false }: NavProps) {
             <Link className="button-secondary hide-mobile min-h-12 rounded-full border-cyan-300/50 bg-black px-7 text-base" href="/upload">
               <Upload size={18} /> Upload File
             </Link>
-            <Link className="button-primary min-h-12 rounded-full px-8 text-base" href="/marketplace">
-              Connect Wallet
-            </Link>
+            <ConnectWalletButton />
           </div>
         </div>
       </header>
@@ -87,13 +86,7 @@ export function Header({ active, landing = false }: NavProps) {
         </div>
         <Bell className="hide-mobile text-zinc-200" size={22} />
         <div className="hide-mobile h-10 w-px bg-white/15" />
-        <div className="flex items-center gap-3">
-          <div className="text-right text-sm">
-            <div className="font-bold">0x7a...4e21</div>
-            <div className="text-xs font-bold text-cyan-300">Connected</div>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-orange-100 via-sky-200 to-zinc-700 ring-2 ring-white/20" />
-        </div>
+        <ConnectWalletButton />
       </div>
     </header>
   );
