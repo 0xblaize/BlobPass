@@ -12,6 +12,7 @@ import { RabbitScene } from "./RabbitScene";
 import { ListingCard } from "@/components/cards";
 import { listings } from "@/lib/data";
 import { TerminalSection } from "./TerminalSection";
+import { AccessControlSection } from "./AccessControlSection";
 
 
 export function LandingPage() {
@@ -69,6 +70,11 @@ export function LandingPage() {
       <hr className="border-white/10 opacity-30" />
 
       <main>
+        {/* --- ACCESS CONTROL SECTION --- */}
+        <div className="border-b border-white/10">
+          <AccessControlSection />
+        </div>
+
         {/* --- HOW IT WORKS SECTION --- */}
         <div className="border-y border-white/10">
           <TerminalSection />
