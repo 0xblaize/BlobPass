@@ -78,27 +78,60 @@ const STEPS = [
   },
 ];
 
-function TerminalWindow({ step, active }: { step: typeof STEPS[0]; active: boolean }) {
+/* Inner animated content — only mounts when active, so state always starts at 0 */
+function TerminalLines({ step }: { step: typeof STEPS[0] }) {
   const [shown, setShown] = useState(0);
   const [cursor, setCursor] = useState(true);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    if (!active) {
-      setShown(0);
-      return;
-    }
-    timers.current = step.lines.map((l, i) =>
+    const timers = step.lines.map((l, i) =>
       setTimeout(() => setShown(i + 1), l.delay + 200)
     );
     const blink = setInterval(() => setCursor(c => !c), 530);
-    return () => { timers.current.forEach(clearTimeout); clearInterval(blink); };
-  }, [active, step]);
+    return () => { timers.forEach(clearTimeout); clearInterval(blink); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const done = shown >= step.lines.length;
 
+  return (
+    <>
+      {step.lines.slice(0, shown).map((l, i) => (
+        <div
+          key={i}
+          style={{
+            fontSize: 13,
+            color: l.color,
+            lineHeight: 1.85,
+            animation: 'termFadeUp 0.22s cubic-bezier(0.22,1,0.36,1) both',
+          }}
+        >
+          {l.text}
+          {i === shown - 1 && !done && (
+            <span style={{
+              display: 'inline-block', width: 5, height: 11,
+              background: '#ECEAE4', marginLeft: 3,
+              opacity: cursor ? 1 : 0,
+              verticalAlign: 'text-bottom',
+            }} />
+          )}
+        </div>
+      ))}
+      {done && (
+        <div style={{ fontSize: 13, color: '#ECEAE4', lineHeight: 1.85 }}>
+          $ <span style={{
+            display: 'inline-block', width: 5, height: 11,
+            background: '#ECEAE4', marginLeft: 3,
+            opacity: cursor ? 1 : 0,
+            verticalAlign: 'text-bottom',
+          }} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function TerminalWindow({ step, active }: { step: typeof STEPS[0]; active: boolean }) {
   return (
     <div
       style={{
@@ -147,38 +180,10 @@ function TerminalWindow({ step, active }: { step: typeof STEPS[0]; active: boole
 
       {/* terminal lines */}
       <div style={{ padding: '14px 18px', minHeight: 152, display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {step.lines.slice(0, shown).map((l, i) => (
-          <div
-            key={i}
-            style={{
-              fontSize: 13,
-              color: active ? l.color : '#2A2A28',
-              lineHeight: 1.85,
-              animation: 'termFadeUp 0.22s cubic-bezier(0.22,1,0.36,1) both',
-              transition: 'color 0.4s',
-            }}
-          >
-            {l.text}
-            {i === shown - 1 && !done && (
-              <span style={{
-                display: 'inline-block', width: 5, height: 11,
-                background: '#ECEAE4', marginLeft: 3,
-                opacity: cursor ? 1 : 0,
-                verticalAlign: 'text-bottom',
-              }} />
-            )}
-          </div>
-        ))}
-        {done && active && (
-          <div style={{ fontSize: 13, color: '#ECEAE4', lineHeight: 1.85 }}>
-            $ <span style={{
-              display: 'inline-block', width: 5, height: 11,
-              background: '#ECEAE4', marginLeft: 3,
-              opacity: cursor ? 1 : 0,
-              verticalAlign: 'text-bottom',
-            }} />
-          </div>
-        )}
+        {active
+          ? <TerminalLines key={step.num} step={step} />
+          : <div style={{ color: '#2A2A28', fontSize: 13, lineHeight: 1.85 }}>{step.lines[0].text}</div>
+        }
       </div>
     </div>
   );
