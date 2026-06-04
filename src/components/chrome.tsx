@@ -3,7 +3,6 @@ import {
   Bell,
   Blocks,
   Database,
-  Github,
   Globe,
   Library,
   Search,
@@ -36,8 +35,8 @@ export function Logo() {
 export function Header({ active, landing = false }: NavProps) {
   if (landing) {
     return (
-      <header className="landing-header">
-        <div className="shell flex h-24 items-center justify-between gap-6">
+      <header className="relative z-20 border-b border-white/10 bg-black/70 backdrop-blur-xl">
+        <div className="mx-auto flex h-24 w-full max-w-[1280px] items-center justify-between gap-6 px-4">
           <Logo />
           <nav className="hide-mobile flex items-center gap-10 text-base font-bold text-zinc-400">
             <a href="#how">How It Works</a>
@@ -45,9 +44,7 @@ export function Header({ active, landing = false }: NavProps) {
             <a href="#for">Who It&apos;s For</a>
           </nav>
           <div className="flex items-center gap-4">
-            <Link className="hide-mobile text-base font-bold text-zinc-400" href="/marketplace">
-              Explore Marketplace
-            </Link>
+          
             <Link className="button-secondary hide-mobile min-h-12 rounded-full border-cyan-300/50 bg-black px-7 text-base" href="/upload">
               <Upload size={18} /> Upload File
             </Link>
@@ -104,28 +101,48 @@ export function Header({ active, landing = false }: NavProps) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/10 py-8 text-sm text-zinc-400">
-      <div className="shell flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
-          <div>
-            <Logo />
-            <p className="mt-1 text-zinc-400">The standard for decentralized asset distribution on the Sui blockchain.</p>
+    <footer className="border-t border-white/10 pt-24 pb-16 mt-32 text-sm text-zinc-400">
+      <div className="shell grid gap-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
+        <div className="space-y-6">
+          <Logo />
+          <p className="max-w-xs text-[11px] leading-6 text-zinc-500">
+            The decentralized gateway for digital commerce on the Sui ecosystem. Powered by Walrus Storage.
+          </p>
+          <div className="text-[10px] text-zinc-600 mt-16">
+            © 2024 BlobPass. Built for the decentralized future.
           </div>
         </div>
-
-        <div className="flex items-center gap-6" aria-label="Social links">
-          <a href="#" aria-label="Twitter">
-            <Twitter size={18} />
-          </a>
-          <a href="#" aria-label="GitHub">
-            <Github size={18} />
-          </a>
-          <a href="#" aria-label="Website">
-            <Globe size={18} />
-          </a>
+        <div className="space-y-6">
+          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Marketplace</h4>
+          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
+            <Link className="hover:text-cyan-300 transition-colors" href="#">All Files</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Latest Listings</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Top Sellers</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Verified Only</Link>
+          </div>
         </div>
-
-        <p className="text-zinc-400">© 2026 BlobPass. Built for Walrus Storage.</p>
+        <div className="space-y-6">
+          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Developers</h4>
+          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
+            <Link className="hover:text-cyan-300 transition-colors" href="#">API Docs</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">SDKs</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Walrus Integration</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Tatum RPC</Link>
+          </div>
+        </div>
+        <div className="space-y-6">
+          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Company</h4>
+          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
+            <Link className="hover:text-cyan-300 transition-colors" href="#">About</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Privacy Policy</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Terms of Service</Link>
+            <Link className="hover:text-cyan-300 transition-colors" href="#">Contact</Link>
+          </div>
+        </div>
+      </div>
+      <div className="shell mt-12 flex justify-end gap-6 text-zinc-600">
+         <a className="hover:text-cyan-300" href="#"><Globe size={16} /></a>
+         <a className="hover:text-cyan-300" href="#"><Twitter size={16} /></a>
       </div>
     </footer>
   );
