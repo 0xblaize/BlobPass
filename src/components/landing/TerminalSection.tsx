@@ -84,8 +84,12 @@ function TerminalWindow({ step, active }: { step: typeof STEPS[0]; active: boole
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    if (!active) { setShown(0); return; }
     timers.current.forEach(clearTimeout);
+    timers.current = [];
+    if (!active) {
+      setShown(0);
+      return;
+    }
     timers.current = step.lines.map((l, i) =>
       setTimeout(() => setShown(i + 1), l.delay + 200)
     );
