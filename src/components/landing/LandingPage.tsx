@@ -3,10 +3,7 @@ import {
   ArrowRight,
   Upload,
   Zap,
-  FileUp,
   Database,
-  LockKeyhole,
-  Coins,
   ShieldCheck,
   CheckCircle,
 } from "lucide-react";
@@ -14,34 +11,8 @@ import { Header, Footer, StackPills } from "@/components/chrome";
 import { RabbitScene } from "./RabbitScene";
 import { ListingCard } from "@/components/cards";
 import { listings } from "@/lib/data";
+import { TerminalSection } from "./TerminalSection";
 
-const steps = [
-  {
-    icon: FileUp,
-    title: "Upload",
-    text: "Drag and drop any file. It's erasure-coded and distributed across Walrus nodes.",
-  },
-  {
-    icon: Database,
-    title: "Store",
-    text: "Your file becomes a permanent 'blob'. Immutable and always available.",
-  },
-  {
-    icon: LockKeyhole,
-    title: "Access Pass",
-    text: "Mint a Sui Kiosk object that acts as the cryptographic key for buyers.",
-  },
-  {
-    icon: Coins,
-    title: "List",
-    text: "Set your price in SUI. Our smart contracts handle the exchange automatically.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Unlock",
-    text: "Buyers pay once to permanently lock the file access to their Sui wallet.",
-  },
-];
 
 export function LandingPage() {
   return (
@@ -99,43 +70,9 @@ export function LandingPage() {
 
       <main>
         {/* --- HOW IT WORKS SECTION --- */}
-        <section id="how" className="border-y border-white/10 py-32">
-          <div className="shell space-y-20 text-center">
-            <div>
-              <h2 className="title text-2xl tracking-widest uppercase">
-                Streamlined Access Control
-              </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-[11px] text-zinc-500">
-                No database. No AWS bill. No backend. Just smart contracts and
-                decentralized storage nodes handling everything.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="absolute top-[24px] left-[10%] right-[10%] h-px border-t border-dashed border-white/15" />
-              <div className="grid gap-6 md:grid-cols-5 relative z-10">
-                {steps.map((step, index) => {
-                  const Icon = step.icon;
-                  return (
-                    <div className="space-y-4 text-center" key={step.title}>
-                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#090b0e] border border-white/5 text-zinc-400">
-                        <Icon size={18} />
-                      </div>
-                      <div className="text-[10px] font-black uppercase text-cyan-300 tracking-widest">
-                        Step 0{index + 1}
-                      </div>
-                      <h3 className="title text-[13px] uppercase tracking-wider">
-                        {step.title}
-                      </h3>
-                      <p className="text-[11px] leading-5 text-zinc-500 max-w-[180px] mx-auto">
-                        {step.text}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
+        <div className="border-y border-white/10">
+          <TerminalSection />
+        </div>
 
         {/* --- MARKETPLACE PREVIEW SECTION --- */}
         <section className="shell space-y-10 py-32">
