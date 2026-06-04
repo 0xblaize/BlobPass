@@ -46,9 +46,10 @@ const steps = [
 export function LandingPage() {
   return (
     <div className="font-mono">
-      <div className="relative min-h-screen overflow-hidden border border-[#2d1574] bg-black">
+      <div className="relative min-h-screen overflow-hidden bg-black">
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.98)_0%,rgba(0,0,0,0.96)_46%,rgba(0,22,20,0.82)_100%)]" />
         <Header landing />
+        {/* --- HERO SECTION --- */}
         <main className="relative z-10 mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[1280px] items-center px-4">
           <section className="grid w-full grid-cols-1 items-center justify-center gap-7 py-10 lg:grid-cols-[minmax(300px,390px)_56px_minmax(440px,580px)] lg:gap-9">
             <div className="relative flex min-h-[350px] items-center justify-center lg:min-h-[540px]">
@@ -94,7 +95,10 @@ export function LandingPage() {
         </main>
       </div>
 
+      <hr className="border-white/10 opacity-30" />
+
       <main>
+        {/* --- HOW IT WORKS SECTION --- */}
         <section id="how" className="border-y border-white/10 py-32">
           <div className="shell space-y-20 text-center">
             <div>
@@ -133,6 +137,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* --- MARKETPLACE PREVIEW SECTION --- */}
         <section className="shell space-y-10 py-32">
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -157,6 +162,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* --- VALUE PROPOSITION SECTION --- */}
         <section id="stack" className="shell grid gap-8 md:grid-cols-2 py-10">
           <div className="panel rounded-3xl p-12">
             <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl bg-cyan-950/30 text-cyan-400 border border-cyan-900/50">
@@ -297,6 +303,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* --- CALL TO ACTION SECTION --- */}
         <section id="for" className="shell py-32">
           <div className="panel mx-auto max-w-[900px] rounded-[40px] p-20 text-center relative overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyan-400/10 blur-[100px] rounded-full pointer-events-none" />
