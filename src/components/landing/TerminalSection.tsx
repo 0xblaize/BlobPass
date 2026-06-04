@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 function useInView(threshold = 0.1) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const el = ref.current;
@@ -193,6 +193,12 @@ export function TerminalSection() {
   const { ref, visible } = useInView(0.08);
   const [active, setActive] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const currentRef = useRef(0);
+
+  const handleSelect = (i: number) => {
+    currentRef.current = i;
+    setActive(i);
+  };
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -204,14 +210,14 @@ export function TerminalSection() {
   useEffect(() => {
     if (!visible) return;
     const DURATIONS = [4000, 4500, 5000];
-    let current = 0;
     let timer: ReturnType<typeof setTimeout>;
     const loop = () => {
-      current = (current + 1) % 3;
-      setActive(current);
-      timer = setTimeout(loop, DURATIONS[current]);
+      const next = (currentRef.current + 1) % 3;
+      currentRef.current = next;
+      setActive(next);
+      timer = setTimeout(loop, DURATIONS[next]);
     };
-    timer = setTimeout(loop, DURATIONS[0]);
+    timer = setTimeout(loop, DURATIONS[currentRef.current]);
     return () => clearTimeout(timer);
   }, [visible]);
 
@@ -227,7 +233,7 @@ export function TerminalSection() {
       `}</style>
 
       <section
-        ref={ref as React.RefObject<HTMLElement>}
+        ref={ref}
         id="how"
         className="shell py-28 space-y-8"
       >
@@ -250,7 +256,8 @@ export function TerminalSection() {
           {STEPS.map((s, i) => (
             <button
               key={i}
-              onClick={() => setActive(i)}
+              type="button"
+              onClick={() => handleSelect(i)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
                 background: active === i ? 'rgba(0,240,255,0.06)' : 'transparent',
@@ -290,12 +297,15 @@ export function TerminalSection() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, maxWidth: 260 }}>
           {STEPS.map((s, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <div
-                onClick={() => setActive(i)}
+              <button
+                type="button"
+                onClick={() => handleSelect(i)}
+                aria-label={`Go to step ${i + 1}: ${s.label}`}
                 style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
                   background: active === i ? s.tagColor : '#333330',
                   transition: 'background 0.3s',
+                  border: 'none', padding: 0,
                 }}
               />
               {i < 2 && (
