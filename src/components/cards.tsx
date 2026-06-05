@@ -1,29 +1,102 @@
+"use client";
+
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
 import {
   ArrowRight,
   Download,
   ExternalLink,
   Image as ImageIcon,
-  MoreHorizontal,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
-import type { Listing } from "@/lib/data";
+import { useState } from "react";
+import type { LibraryAssetView, MarketplaceListing } from "@/lib/blobpass/types";
 
-export function ListingCard({ item }: { item: Listing }) {
+function PreviewImage({
+  item,
+  heightClass,
+}: {
+  item: Pick<MarketplaceListing | LibraryAssetView, "previewImageUrl" | "gradient" | "category">;
+  heightClass: string;
+}) {
   return (
-    <article className="panel overflow-hidden rounded-lg">
-      <div className={`asset-image relative h-44 bg-gradient-to-br ${item.gradient}`}>
-        <span className="absolute right-3 top-3 rounded-full bg-black/80 px-3 py-1 text-xs font-black text-cyan-300">
-          WALRUS
-        </span>
-        <span className="absolute bottom-4 left-4 rounded-full border border-cyan-300/50 bg-cyan-400/30 px-3 py-1 text-xs font-bold text-cyan-100">
-          {item.category}
-        </span>
+    <div className={`asset-image relative overflow-hidden bg-gradient-to-br ${item.gradient} ${heightClass}`}>
+      {item.previewImageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt="" className="h-full w-full object-cover opacity-80" src={item.previewImageUrl} />
+      ) : (
         <ImageIcon
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-400/70"
           size={52}
         />
-      </div>
+      )}
+      <span className="absolute right-3 top-3 rounded-full bg-black/80 px-3 py-1 text-xs font-black text-cyan-300">
+        WALRUS
+      </span>
+      <span className="absolute bottom-4 left-4 rounded-full border border-cyan-300/50 bg-cyan-400/30 px-3 py-1 text-xs font-bold text-cyan-100">
+        {item.category}
+      </span>
+    </div>
+  );
+}
+
+function usePurchase(item: MarketplaceListing) {
+  const account = useCurrentAccount();
+  const purchaseMutation = useSignAndExecuteTransaction();
+  const [state, setState] = useState<"idle" | "buying" | "owned" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function buy() {
+    if (!account?.address) {
+      setState("error");
+      setErrorMessage("Connect a Sui wallet before purchasing access.");
+      return;
+    }
+
+    setState("buying");
+    setErrorMessage("");
+
+    try {
+      const isDemoListing = item.listingKioskId.startsWith("0xkiosk_");
+
+      if (!isDemoListing) {
+        throw new Error(
+          "Native kiosk::purchase PTB wiring still needs the deployed listing and transfer policy object references.",
+        );
+      }
+
+      const response = await fetch("/api/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passId: item.passId,
+          buyerAddress: account.address,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Purchase request failed");
+      }
+
+      setState("owned");
+    } catch (error) {
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Purchase handshake failed.");
+    }
+  }
+
+  return { buy, state, account, errorMessage, purchaseMutation };
+}
+
+export function ListingCard({ item }: { item: MarketplaceListing }) {
+  const { buy, state, account, errorMessage, purchaseMutation } = usePurchase(item);
+
+  return (
+    <article className="panel overflow-hidden rounded-lg">
+      <PreviewImage heightClass="h-44" item={item} />
       <div className="space-y-4 p-5">
         <h3 className="text-xl font-black">{item.title}</h3>
         <p className="min-h-12 text-sm leading-6 text-zinc-400">{item.description}</p>
@@ -36,17 +109,33 @@ export function ListingCard({ item }: { item: Listing }) {
             <div className="text-xs font-bold text-zinc-400">PRICE</div>
             <div className="title text-2xl text-cyan-300">{item.price} SUI</div>
           </div>
-          <button className="button-primary min-h-10 px-4 text-sm">Buy Access</button>
+          <button
+            className="button-primary min-h-10 px-4 text-sm"
+            disabled={
+              state === "buying" ||
+              state === "owned" ||
+              !account?.address ||
+              purchaseMutation.isPending
+            }
+            onClick={buy}
+          >
+            {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Access"}
+          </button>
         </div>
+        {state === "error" ? (
+          <p className="text-xs font-bold text-red-300">{errorMessage}</p>
+        ) : null}
       </div>
     </article>
   );
 }
 
-export function FeatureListing({ item }: { item: Listing }) {
+export function FeatureListing({ item }: { item: MarketplaceListing }) {
+  const { buy, state, account, errorMessage, purchaseMutation } = usePurchase(item);
+
   return (
     <article className="panel grid gap-5 rounded-xl border-cyan-300/30 p-6 md:grid-cols-[220px_1fr]">
-      <div className={`asset-image relative min-h-56 rounded-lg bg-gradient-to-br ${item.gradient}`} />
+      <PreviewImage heightClass="min-h-56 rounded-lg" item={item} />
       <div className="flex flex-col justify-between gap-5">
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -72,34 +161,35 @@ export function FeatureListing({ item }: { item: Listing }) {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="title text-3xl text-cyan-300">{item.price} SUI</div>
-          <button className="button-primary">
-            Buy Instant Access <ArrowRight size={18} />
+          <button
+            className="button-primary"
+            disabled={
+              state === "buying" ||
+              state === "owned" ||
+              !account?.address ||
+              purchaseMutation.isPending
+            }
+            onClick={buy}
+          >
+            {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Instant Access"}
+            <ArrowRight size={18} />
           </button>
         </div>
+        {state === "error" ? (
+          <p className="text-xs font-bold text-red-300">{errorMessage}</p>
+        ) : null}
       </div>
     </article>
   );
 }
 
-export function LibraryCard({
-  asset,
-}: {
-  asset: {
-    title: string;
-    category: string;
-    status: string;
-    action: string;
-    price: string;
-    date: string;
-    blob: string;
-    gradient: string;
-  };
-}) {
+export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const owned = asset.status === "Owned";
 
   return (
     <article className="panel overflow-hidden rounded-lg">
-      <div className={`asset-image relative h-48 bg-gradient-to-br ${asset.gradient}`}>
+      <div className="relative">
+        <PreviewImage heightClass="h-48" item={asset} />
         <span
           className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-black ${
             owned ? "bg-cyan-300 text-black" : "bg-black text-white"
@@ -117,11 +207,10 @@ export function LibraryCard({
             <div className="text-xs font-black uppercase text-cyan-300">{asset.category}</div>
             <h3 className="mt-1 text-xl font-black">{asset.title}</h3>
           </div>
-          <MoreHorizontal size={20} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 text-xs text-zinc-400">
           <span>{asset.date}</span>
-          <span>{asset.blob}</span>
+          <span>{asset.blobLabel}</span>
         </div>
         {asset.price ? (
           <div className="flex items-center justify-between text-sm">
@@ -129,10 +218,58 @@ export function LibraryCard({
             <strong className="text-cyan-300">{asset.price}</strong>
           </div>
         ) : null}
-        <button className={owned ? "button-primary w-full" : "button-secondary w-full"}>
-          {owned ? <Download size={17} /> : <ExternalLink size={17} />}
-          {asset.action}
-        </button>
+        {owned && asset.rawFileBlobId ? (
+          <button
+            className="button-primary w-full"
+            onClick={async () => {
+              const search = new URLSearchParams(asset.downloadUrl?.split("?")[1] ?? "");
+              const walletAddress = search.get("address");
+
+              if (!walletAddress) {
+                return;
+              }
+
+              const response = await fetch("/api/download", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  passId: asset.passId,
+                  blobId: asset.rawFileBlobId,
+                  walletAddress,
+                }),
+              });
+
+              if (!response.ok) {
+                window.alert("Access denied: this wallet does not own the required Blob Pass.");
+                return;
+              }
+
+              const blob = await response.blob();
+              const downloadUrl = window.URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = downloadUrl;
+              link.download = `${asset.title}.bin`;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.URL.revokeObjectURL(downloadUrl);
+            }}
+            type="button"
+          >
+            <Download size={17} />
+            {asset.action}
+          </button>
+        ) : (
+          <a
+            className={owned ? "button-primary w-full" : "button-secondary w-full"}
+            href={asset.downloadUrl ?? "/marketplace"}
+          >
+            {owned ? <Download size={17} /> : <ExternalLink size={17} />}
+            {asset.action}
+          </a>
+        )}
       </div>
     </article>
   );

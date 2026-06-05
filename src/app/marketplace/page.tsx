@@ -1,11 +1,13 @@
 import { Blocks, Filter, Search, TrendingUp } from "lucide-react";
 import { FeatureListing, ListingCard } from "@/components/cards";
 import { Footer, Header } from "@/components/chrome";
-import { listings } from "@/lib/data";
+import { getMarketplaceListings } from "@/lib/blobpass/ledger";
 
 const categories = ["All Files", "Datasets", "Video", "Source Code", "Documents", "AI Models"];
 
-export default function MarketplacePage() {
+export default async function MarketplacePage() {
+  const listings = await getMarketplaceListings();
+
   return (
     <>
       <Header active="marketplace" />
@@ -57,7 +59,7 @@ export default function MarketplacePage() {
           </div>
           <div className="grid gap-7 xl:grid-cols-2">
             {listings.slice(0, 2).map((item) => (
-              <FeatureListing item={item} key={item.id} />
+              <FeatureListing item={item} key={item.passId} />
             ))}
           </div>
         </section>
@@ -71,7 +73,7 @@ export default function MarketplacePage() {
           </div>
           <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {listings.map((item) => (
-              <ListingCard item={item} key={item.id} />
+              <ListingCard item={item} key={item.passId} />
             ))}
           </div>
         </section>

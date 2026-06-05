@@ -45,8 +45,10 @@ export function Header({ active, landing = false }: NavProps) {
             <a href="#for">Who It&apos;s For</a>
           </nav>
           <div className="flex items-center gap-4">
-          
-            <Link className="button-secondary hide-mobile min-h-12 rounded-full border-cyan-300/50 bg-black px-7 text-base" href="/upload">
+            <Link
+              className="button-secondary hide-mobile min-h-12 rounded-full border-cyan-300/50 bg-black px-7 text-base"
+              href="/upload"
+            >
               <Upload size={18} /> Upload File
             </Link>
             <ConnectWalletButton />
@@ -64,6 +66,7 @@ export function Header({ active, landing = false }: NavProps) {
           {nav.map((item) => {
             const Icon = item.icon;
             const isActive = active === item.key;
+
             return (
               <Link
                 className={`inline-flex h-11 items-center gap-3 rounded-lg px-4 font-bold ${
@@ -94,54 +97,80 @@ export function Header({ active, landing = false }: NavProps) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/10 pt-24 pb-16 mt-32 text-sm text-zinc-400">
+    <footer className="mt-32 border-t border-white/10 pb-16 pt-24 text-sm text-zinc-400">
       <div className="shell grid gap-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
         <div className="space-y-6">
           <Logo />
           <p className="max-w-xs text-[11px] leading-6 text-zinc-500">
             The decentralized gateway for digital commerce on the Sui ecosystem. Powered by Walrus Storage.
           </p>
-          <div className="text-[10px] text-zinc-600 mt-16">
-            © 2024 BlobPass. Built for the decentralized future.
+          <div className="mt-16 text-[10px] text-zinc-600">
+            Copyright 2026 BlobPass. Built for the decentralized future.
           </div>
         </div>
         <div className="space-y-6">
-          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Marketplace</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Marketplace</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="hover:text-cyan-300 transition-colors" href="#">All Files</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Latest Listings</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Top Sellers</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Verified Only</Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              All Files
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Latest Listings
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Top Sellers
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Verified Only
+            </Link>
           </div>
         </div>
         <div className="space-y-6">
-          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Developers</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Developers</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="hover:text-cyan-300 transition-colors" href="#">API Docs</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">SDKs</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Walrus Integration</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Tatum RPC</Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              API Docs
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              SDKs
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Walrus Integration
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Tatum RPC
+            </Link>
           </div>
         </div>
         <div className="space-y-6">
-          <h4 className="font-bold text-[10px] uppercase tracking-widest text-white">Company</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Company</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="hover:text-cyan-300 transition-colors" href="#">About</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Privacy Policy</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Terms of Service</Link>
-            <Link className="hover:text-cyan-300 transition-colors" href="#">Contact</Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              About
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Privacy Policy
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Terms of Service
+            </Link>
+            <Link className="transition-colors hover:text-cyan-300" href="#">
+              Contact
+            </Link>
           </div>
         </div>
       </div>
       <div className="shell mt-12 flex justify-end gap-6 text-zinc-600">
-         <a className="hover:text-cyan-300" href="#"><Globe size={16} /></a>
-         <a className="hover:text-cyan-300" href="#"><Twitter size={16} /></a>
+        <a className="hover:text-cyan-300" href="#">
+          <Globe size={16} />
+        </a>
+        <a className="hover:text-cyan-300" href="#">
+          <Twitter size={16} />
+        </a>
       </div>
     </footer>
   );
 }
-
-
 
 export function StackPills() {
   return (

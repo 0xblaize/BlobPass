@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Mono, Work_Sans } from "next/font/google";
+import "@mysten/dapp-kit/dist/index.css";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
@@ -20,6 +21,11 @@ export const metadata: Metadata = {
   title: "BlobPass",
   description:
     "A marketplace for files stored on Walrus, sold through Sui access passes.",
+  icons: {
+    icon: "/favicon.jpg",
+    shortcut: "/favicon.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({
@@ -29,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${workSans.variable} ${spaceMono.variable}`}>
-      <body>
+      <body className="antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

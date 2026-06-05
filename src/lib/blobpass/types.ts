@@ -1,0 +1,98 @@
+export type BlobPassRuntimeSource = "demo" | "walrus" | "tatum" | "hybrid";
+
+export type BlobVisibility = "public" | "hidden";
+
+export type DataAccessPassFields = {
+  title: string;
+  description: string;
+  file_size: string;
+  file_type: string;
+  preview_image_url: string;
+  walrus_blob_id: string;
+};
+
+export type DataAccessPassObject = {
+  id: string;
+  owner: string;
+  seller: string;
+  sellerKioskId: string;
+  listingKioskId: string;
+  category: string;
+  priceMist: string;
+  createdAt: string;
+  purchases: number;
+  gradient: string;
+  listed: boolean;
+  content: {
+    fields: DataAccessPassFields;
+  };
+};
+
+export type UploadReceipt = {
+  blobId: string;
+  url: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  visibility: BlobVisibility;
+  source: BlobPassRuntimeSource;
+};
+
+export type TransactionCallSpec = {
+  kind: "moveCall" | "kioskAction";
+  target: string;
+  arguments: Record<string, string | number | boolean | null>;
+};
+
+export type TransactionSpec = {
+  chain: "sui";
+  title: string;
+  description: string;
+  packageId: string;
+  kioskId: string;
+  calls: TransactionCallSpec[];
+  requiresWalletSignature: boolean;
+};
+
+export type MarketplaceListing = {
+  id: string;
+  passId: string;
+  title: string;
+  category: string;
+  description: string;
+  seller: string;
+  sellerKioskId: string;
+  listingKioskId: string;
+  price: string;
+  priceMist: string;
+  size: string;
+  fileType: string;
+  purchases: string;
+  previewImageUrl: string;
+  previewBlobLabel: string;
+  date: string;
+  gradient: string;
+  source: BlobPassRuntimeSource;
+};
+
+export type LibraryAssetView = {
+  passId: string;
+  title: string;
+  category: string;
+  status: "Owned" | "Your Listing" | "Locked";
+  action: string;
+  price: string;
+  date: string;
+  blobLabel: string;
+  gradient: string;
+  downloadUrl?: string;
+  rawFileBlobId?: string;
+  previewImageUrl: string;
+  source: BlobPassRuntimeSource;
+};
+
+export type LibraryStats = {
+  ownedAssets: string;
+  activeListings: string;
+  totalEarnings: string;
+};

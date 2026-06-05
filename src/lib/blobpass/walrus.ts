@@ -1,0 +1,171 @@
+import { createHash } from "crypto";
+import { getDemoBlob, setDemoBlob } from "./demo-store";
+import type { BlobVisibility, UploadReceipt } from "./types";
+
+type StoreWalrusBlobInput = {
+  file: File;
+  visibility: BlobVisibility;
+  origin?: string;
+};
+
+function getWalrusPublisherUrl() {
+  return process.env.WALRUS_PUBLISHER_URL || process.env.NEXT_PUBLIC_WALRUS_PUBLISHER || "";
+}
+
+function getWalrusAggregatorUrl() {
+  return process.env.WALRUS_AGGREGATOR_URL || process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR || "";
+}
+
+function extractWalrusBlobId(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  const record = payload as Record<string, unknown>;
+  const newlyCreated = record.newlyCreated as Record<string, unknown> | undefined;
+  const alreadyCertified = record.alreadyCertified as Record<string, unknown> | undefined;
+  const blobObject = newlyCreated?.blobObject as Record<string, unknown> | undefined;
+  const blobId = blobObject?.blobId ?? alreadyCertified?.blobId ?? record.blobId;
+
+  return typeof blobId === "string" ? blobId : "";
+}
+
+function bytesToArrayBuffer(bytes: Uint8Array) {
+  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(arrayBuffer).set(bytes);
+  return arrayBuffer;
+}
+
+function contentTypeFor(file: File) {
+  return file.type || "application/octet-stream";
+}
+
+function walrusBlobUrl(blobId: string) {
+  const aggregator = getWalrusAggregatorUrl();
+
+  if (!aggregator) {
+    return "";
+  }
+
+  return `${aggregator.replace(/\/$/, "")}/v1/blobs/${encodeURIComponent(blobId)}`;
+}
+
+export async function storeWalrusBlob({
+  file,
+  visibility,
+  origin,
+}: StoreWalrusBlobInput): Promise<UploadReceipt> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const contentType = contentTypeFor(file);
+  const publisher = getWalrusPublisherUrl();
+
+  if (publisher) {
+    const url = new URL("/v1/blobs", publisher);
+    url.searchParams.set("epochs", process.env.WALRUS_STORAGE_EPOCHS ?? "5");
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+      },
+      body: Buffer.from(bytes),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Walrus upload failed with HTTP ${response.status}`);
+    }
+
+    const payload: unknown = await response.json();
+    const blobId = extractWalrusBlobId(payload);
+
+    if (!blobId) {
+      throw new Error("Walrus upload succeeded without a blob id");
+    }
+
+    return {
+      blobId,
+      url: walrusBlobUrl(blobId),
+      filename: file.name,
+      contentType,
+      size: file.size,
+      visibility,
+      source: "walrus",
+    };
+  }
+
+  const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
+  const blobId = `demo_${visibility}_${digest}`;
+
+  setDemoBlob({
+    blobId,
+    bytes,
+    contentType,
+    filename: file.name,
+    visibility,
+  });
+
+  return {
+    blobId,
+    url: `${origin ?? ""}/api/walrus/${encodeURIComponent(blobId)}`,
+    filename: file.name,
+    contentType,
+    size: file.size,
+    visibility,
+    source: "demo",
+  };
+}
+
+export function getPublicDemoWalrusBlob(blobId: string) {
+  const blob = getDemoBlob(blobId);
+
+  if (!blob || blob.visibility !== "public") {
+    return null;
+  }
+
+  return new Response(bytesToArrayBuffer(blob.bytes), {
+    headers: {
+      "Content-Type": blob.contentType,
+    },
+  });
+}
+
+export async function readProtectedWalrusBlob(blobId: string) {
+  const demoBlob = getDemoBlob(blobId);
+
+  if (demoBlob) {
+    return new Response(bytesToArrayBuffer(demoBlob.bytes), {
+      headers: {
+        "Content-Type": demoBlob.contentType,
+        "Content-Length": String(demoBlob.bytes.byteLength),
+      },
+    });
+  }
+
+  const aggregator = getWalrusAggregatorUrl();
+
+  if (aggregator) {
+    const response = await fetch(
+      `${aggregator.replace(/\/$/, "")}/v1/blobs/${encodeURIComponent(blobId)}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Walrus download failed with HTTP ${response.status}`);
+    }
+
+    return response;
+  }
+
+  return new Response(
+    [
+      "BlobPass demo payload",
+      `Walrus blob: ${blobId}`,
+      "Replace WALRUS_AGGREGATOR_URL or NEXT_PUBLIC_WALRUS_AGGREGATOR to stream the real protected object.",
+      "",
+    ].join("\n"),
+    {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    },
+  );
+}

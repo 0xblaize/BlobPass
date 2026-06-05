@@ -10,12 +10,13 @@ import {
 import { Header, Footer, StackPills } from "@/components/chrome";
 import { RabbitScene } from "./RabbitScene";
 import { ListingCard } from "@/components/cards";
-import { listings } from "@/lib/data";
-import { TerminalSection } from "./TerminalSection";
 import { AccessControlSection } from "./AccessControlSection";
+import { TerminalSection } from "./TerminalSection";
+import { getMarketplaceListings } from "@/lib/blobpass/ledger";
 
+export async function LandingPage() {
+  const listings = await getMarketplaceListings();
 
-export function LandingPage() {
   return (
     <div className="font-mono">
       <div className="relative min-h-screen overflow-hidden bg-black">
@@ -100,7 +101,7 @@ export function LandingPage() {
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {listings.slice(0, 4).map((item) => (
-              <ListingCard item={item} key={item.id} />
+              <ListingCard item={item} key={item.passId} />
             ))}
           </div>
         </section>

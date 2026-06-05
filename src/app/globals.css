@@ -47,6 +47,18 @@ textarea {
   font: inherit;
 }
 
+[data-dapp-kit] {
+  --dapp-kit-background: linear-gradient(135deg, var(--cyan), var(--blue));
+  --dapp-kit-background-hover: linear-gradient(135deg, #4cfeff, #4590ff);
+  --dapp-kit-background-active: linear-gradient(135deg, #00dbe7, #246ce3);
+  --dapp-kit-foreground: #001012;
+  --dapp-kit-border-radius: 999px;
+  --dapp-kit-font-family: var(--font-sans);
+  --dapp-kit-font-weight: 800;
+  --dapp-kit-button-height: 48px;
+  --dapp-kit-shadow: 0 14px 40px rgba(0, 240, 255, 0.18);
+}
+
 a {
   color: inherit;
   text-decoration: none;
