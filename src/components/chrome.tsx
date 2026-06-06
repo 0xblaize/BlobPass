@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import {
+  Blocks,
   Database,
   Library,
   Upload,
@@ -15,7 +16,7 @@ type NavProps = {
 };
 
 const nav = [
-
+  { href: "/marketplace", label: "Marketplace", key: "marketplace", icon: Blocks },
   { href: "/upload", label: "Upload", key: "upload", icon: Upload },
   { href: "/library", label: "My Library", key: "library", icon: Library },
 ] as const;

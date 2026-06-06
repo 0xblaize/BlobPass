@@ -83,8 +83,6 @@ async function ensureRegistryDir() {
 }
 
 async function readRegistry(): Promise<RegistryState> {
-  await ensureRegistryDir();
-
   try {
     const raw = await readFile(REGISTRY_FILE, "utf8");
     const parsed = JSON.parse(raw) as Partial<RegistryState>;
@@ -95,7 +93,15 @@ async function readRegistry(): Promise<RegistryState> {
       passes: Array.isArray(parsed.passes) ? parsed.passes.map(normalizePassRecord) : [],
     };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    const code = (error as NodeJS.ErrnoException).code;
+
+    if (
+      code === "ENOENT" ||
+      code === "ENOTDIR" ||
+      code === "EACCES" ||
+      code === "EPERM" ||
+      code === "EROFS"
+    ) {
       return createEmptyRegistry();
     }
 
