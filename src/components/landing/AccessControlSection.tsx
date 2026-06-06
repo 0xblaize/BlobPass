@@ -13,7 +13,7 @@ const steps = [
     number: "02",
     label: "Store",
     description:
-      "Your file becomes a permanent 'blob'. Immutable and always available.",
+      "Your file becomes a durable Walrus blob that stays addressable for gated delivery.",
   },
   {
     icon: Lock,
@@ -46,8 +46,8 @@ export function AccessControlSection() {
           Streamlined Access Control
         </h2>
         <p className="mt-4 text-[13px] text-zinc-500 max-w-xl mx-auto leading-relaxed">
-          No database. No AWS bill. No backend. Just smart contracts and
-          decentralized storage nodes handling everything.
+          Sui access passes, Tatum RPC verification, and Walrus storage keep
+          the marketplace flow lean without a custom product database.
         </p>
       </div>
 

@@ -1,15 +1,14 @@
 import Link from "next/link";
+import Image from "next/image";
+import { Suspense } from "react";
 import {
-  Bell,
   Blocks,
   Database,
-  Globe,
   Library,
-  Search,
-  Twitter,
   Upload,
 } from "lucide-react";
 import { ConnectWalletButton } from "./ConnectWalletButton";
+import { GlobalMarketplaceSearch } from "./GlobalMarketplaceSearch";
 
 type NavProps = {
   active?: "marketplace" | "upload" | "library";
@@ -25,8 +24,15 @@ const nav = [
 export function Logo() {
   return (
     <Link className="flex items-center gap-2" href="/">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-300 text-black">
-        <Blocks size={20} />
+      <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/35 bg-black/70 shadow-[0_0_24px_rgba(34,211,238,0.2)]">
+        <Image
+          alt="BlobPass logo"
+          className="h-full w-full object-cover"
+          height={40}
+          priority
+          src="/logo.jpg"
+          width={40}
+        />
       </span>
       <span className="title text-xl text-cyan-300">BlobPass</span>
     </Link>
@@ -44,9 +50,15 @@ export function Header({ active, landing = false }: NavProps) {
             <a href="#stack">The Stack</a>
             <a href="#for">Who It&apos;s For</a>
           </nav>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
-              className="button-secondary hide-mobile min-h-12 rounded-full border-cyan-300/50 bg-black px-7 text-base"
+              className="button-primary hide-mobile min-h-12 min-w-[170px] rounded-full px-7 text-base shadow-[0_0_28px_rgba(34,211,238,0.18)]"
+              href="/marketplace"
+            >
+              <Blocks size={18} /> Marketplace
+            </Link>
+            <Link
+              className="button-secondary hide-mobile min-h-12 min-w-[170px] rounded-full border-cyan-300/40 bg-black/70 px-7 text-base text-zinc-100"
               href="/upload"
             >
               <Upload size={18} /> Upload File
@@ -83,15 +95,26 @@ export function Header({ active, landing = false }: NavProps) {
             );
           })}
         </nav>
-        <div className="ml-auto hidden h-11 min-w-[280px] items-center gap-3 rounded-lg border border-white/15 bg-zinc-950 px-4 text-zinc-400 md:flex">
-          <Search size={18} />
-          <span>Search files...</span>
-        </div>
-        <Bell className="hide-mobile text-zinc-200" size={22} />
-        <div className="hide-mobile h-10 w-px bg-white/15" />
+        <Suspense
+          fallback={
+            <div className="ml-auto hidden h-11 min-w-[280px] items-center gap-3 rounded-lg border border-white/15 bg-zinc-950 px-4 text-zinc-500 md:flex">
+              <SearchPlaceholder />
+            </div>
+          }
+        >
+          <GlobalMarketplaceSearch />
+        </Suspense>
         <ConnectWalletButton />
       </div>
     </header>
+  );
+}
+
+function SearchPlaceholder() {
+  return (
+    <>
+      <span className="text-sm">Search marketplace...</span>
+    </>
   );
 }
 
@@ -111,62 +134,54 @@ export function Footer() {
         <div className="space-y-6">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Marketplace</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="#">
+            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
               All Files
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Latest Listings
+            <Link className="transition-colors hover:text-cyan-300" href="/marketplace#trending-highlights">
+              Trending Highlights
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Top Sellers
+            <Link className="transition-colors hover:text-cyan-300" href="/marketplace#latest-discoveries">
+              Latest Discoveries
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Verified Only
+            <Link className="transition-colors hover:text-cyan-300" href="/upload">
+              List an Asset
             </Link>
           </div>
         </div>
         <div className="space-y-6">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Developers</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              API Docs
+            <Link className="transition-colors hover:text-cyan-300" href="/upload">
+              Upload Flow
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              SDKs
+            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
+              Purchase Flow
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Walrus Integration
+            <Link className="transition-colors hover:text-cyan-300" href="/library">
+              Download Flow
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Tatum RPC
+            <Link className="transition-colors hover:text-cyan-300" href="/">
+              Architecture
             </Link>
           </div>
         </div>
         <div className="space-y-6">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Company</h4>
           <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="#">
+            <Link className="transition-colors hover:text-cyan-300" href="/">
               About
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Privacy Policy
+            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
+              Marketplace
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Terms of Service
+            <Link className="transition-colors hover:text-cyan-300" href="/upload">
+              Upload
             </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="#">
-              Contact
+            <Link className="transition-colors hover:text-cyan-300" href="/library">
+              My Library
             </Link>
           </div>
         </div>
-      </div>
-      <div className="shell mt-12 flex justify-end gap-6 text-zinc-600">
-        <a className="hover:text-cyan-300" href="#">
-          <Globe size={16} />
-        </a>
-        <a className="hover:text-cyan-300" href="#">
-          <Twitter size={16} />
-        </a>
       </div>
     </footer>
   );

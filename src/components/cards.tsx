@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useCurrentAccount,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import {
   ArrowRight,
   Download,
@@ -45,7 +42,6 @@ function PreviewImage({
 
 function usePurchase(item: MarketplaceListing) {
   const account = useCurrentAccount();
-  const purchaseMutation = useSignAndExecuteTransaction();
   const [state, setState] = useState<"idle" | "buying" | "owned" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -60,14 +56,6 @@ function usePurchase(item: MarketplaceListing) {
     setErrorMessage("");
 
     try {
-      const isDemoListing = item.listingKioskId.startsWith("0xkiosk_");
-
-      if (!isDemoListing) {
-        throw new Error(
-          "Native kiosk::purchase PTB wiring still needs the deployed listing and transfer policy object references.",
-        );
-      }
-
       const response = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +66,8 @@ function usePurchase(item: MarketplaceListing) {
       });
 
       if (!response.ok) {
-        throw new Error("Purchase request failed");
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Purchase request failed");
       }
 
       setState("owned");
@@ -88,11 +77,11 @@ function usePurchase(item: MarketplaceListing) {
     }
   }
 
-  return { buy, state, account, errorMessage, purchaseMutation };
+  return { buy, state, account, errorMessage };
 }
 
 export function ListingCard({ item }: { item: MarketplaceListing }) {
-  const { buy, state, account, errorMessage, purchaseMutation } = usePurchase(item);
+  const { buy, state, account, errorMessage } = usePurchase(item);
 
   return (
     <article className="panel overflow-hidden rounded-lg">
@@ -111,13 +100,9 @@ export function ListingCard({ item }: { item: MarketplaceListing }) {
           </div>
           <button
             className="button-primary min-h-10 px-4 text-sm"
-            disabled={
-              state === "buying" ||
-              state === "owned" ||
-              !account?.address ||
-              purchaseMutation.isPending
-            }
+            disabled={state === "buying" || state === "owned" || !account?.address}
             onClick={buy}
+            type="button"
           >
             {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Access"}
           </button>
@@ -131,7 +116,7 @@ export function ListingCard({ item }: { item: MarketplaceListing }) {
 }
 
 export function FeatureListing({ item }: { item: MarketplaceListing }) {
-  const { buy, state, account, errorMessage, purchaseMutation } = usePurchase(item);
+  const { buy, state, account, errorMessage } = usePurchase(item);
 
   return (
     <article className="panel grid gap-5 rounded-xl border-cyan-300/30 p-6 md:grid-cols-[220px_1fr]">
@@ -163,13 +148,9 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
           <div className="title text-3xl text-cyan-300">{item.price} SUI</div>
           <button
             className="button-primary"
-            disabled={
-              state === "buying" ||
-              state === "owned" ||
-              !account?.address ||
-              purchaseMutation.isPending
-            }
+            disabled={state === "buying" || state === "owned" || !account?.address}
             onClick={buy}
+            type="button"
           >
             {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Instant Access"}
             <ArrowRight size={18} />
@@ -185,6 +166,8 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
 export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const owned = asset.status === "Owned";
+  const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "error">("idle");
+  const [downloadError, setDownloadError] = useState("");
 
   return (
     <article className="panel overflow-hidden rounded-lg">
@@ -221,13 +204,19 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
         {owned && asset.rawFileBlobId ? (
           <button
             className="button-primary w-full"
+            disabled={downloadState === "downloading"}
             onClick={async () => {
               const search = new URLSearchParams(asset.downloadUrl?.split("?")[1] ?? "");
               const walletAddress = search.get("address");
 
               if (!walletAddress) {
+                setDownloadState("error");
+                setDownloadError("No wallet address was attached to this asset download.");
                 return;
               }
+
+              setDownloadState("downloading");
+              setDownloadError("");
 
               const response = await fetch("/api/download", {
                 method: "POST",
@@ -242,7 +231,9 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
               });
 
               if (!response.ok) {
-                window.alert("Access denied: this wallet does not own the required Blob Pass.");
+                const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+                setDownloadState("error");
+                setDownloadError(payload?.error || "Access denied: this wallet does not own the required Blob Pass.");
                 return;
               }
 
@@ -255,11 +246,12 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
               link.click();
               link.remove();
               window.URL.revokeObjectURL(downloadUrl);
+              setDownloadState("idle");
             }}
             type="button"
           >
             <Download size={17} />
-            {asset.action}
+            {downloadState === "downloading" ? "Downloading..." : asset.action}
           </button>
         ) : (
           <a
@@ -270,6 +262,7 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
             {asset.action}
           </a>
         )}
+        {downloadError ? <p className="text-xs font-bold text-red-300">{downloadError}</p> : null}
       </div>
     </article>
   );

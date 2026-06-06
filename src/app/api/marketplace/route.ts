@@ -8,7 +8,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    source: listings[0]?.source ?? "demo",
+    source: listings[0]?.source ?? "hybrid",
     listings,
   });
 }

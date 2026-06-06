@@ -14,15 +14,20 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const scene = new THREE.Scene();
     const rabbitRoot = new THREE.Group();
     scene.add(rabbitRoot);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     renderer.domElement.className = "block h-full w-full";
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     mount.appendChild(renderer.domElement);
 
@@ -48,6 +53,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     let lastPointerX = 0;
     let targetRotation = 0;
     let currentRotation = 0;
+    let isVisible = true;
 
     const fitCameraToModel = () => {
       const box = new THREE.Box3().setFromObject(rabbitRoot);
@@ -149,9 +155,22 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     resize();
     window.addEventListener("resize", resize);
 
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry?.isIntersecting ?? true;
+      },
+      { threshold: 0.1 },
+    );
+    visibilityObserver.observe(mount);
+
     let frame = 0;
     const animate = () => {
-      if (!isPointerDown && mount.matches(":hover")) {
+      if (!isVisible) {
+        frame = window.requestAnimationFrame(animate);
+        return;
+      }
+
+      if (!prefersReducedMotion && !isPointerDown && mount.matches(":hover")) {
         targetRotation += 0.006;
       }
 
@@ -170,6 +189,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
+      visibilityObserver.disconnect();
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);

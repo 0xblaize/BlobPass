@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
-import { getDemoBlob, setDemoBlob } from "./demo-store";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
 import type { BlobVisibility, UploadReceipt } from "./types";
 
 type StoreWalrusBlobInput = {
@@ -40,6 +41,68 @@ function contentTypeFor(file: File) {
   return file.type || "application/octet-stream";
 }
 
+type LocalBlobRecord = {
+  blobId: string;
+  contentType: string;
+  filename: string;
+  visibility: BlobVisibility;
+};
+
+const LOCAL_BLOB_DIR = path.join(process.cwd(), ".blobpass", "blobs");
+
+async function ensureLocalBlobDir() {
+  await mkdir(LOCAL_BLOB_DIR, { recursive: true });
+}
+
+function localBlobPath(blobId: string) {
+  return path.join(LOCAL_BLOB_DIR, `${blobId}.bin`);
+}
+
+function localBlobMetaPath(blobId: string) {
+  return path.join(LOCAL_BLOB_DIR, `${blobId}.json`);
+}
+
+async function setLocalBlob(
+  blobId: string,
+  bytes: Uint8Array,
+  meta: Omit<LocalBlobRecord, "blobId">,
+) {
+  await ensureLocalBlobDir();
+  await writeFile(localBlobPath(blobId), Buffer.from(bytes));
+  await writeFile(
+    localBlobMetaPath(blobId),
+    JSON.stringify(
+      {
+        blobId,
+        ...meta,
+      } satisfies LocalBlobRecord,
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
+async function getLocalBlob(blobId: string) {
+  try {
+    const [bytes, meta] = await Promise.all([
+      readFile(localBlobPath(blobId)),
+      readFile(localBlobMetaPath(blobId), "utf8"),
+    ]);
+
+    return {
+      bytes: new Uint8Array(bytes),
+      meta: JSON.parse(meta) as LocalBlobRecord,
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 function walrusBlobUrl(blobId: string) {
   const aggregator = getWalrusAggregatorUrl();
 
@@ -60,45 +123,46 @@ export async function storeWalrusBlob({
   const publisher = getWalrusPublisherUrl();
 
   if (publisher) {
-    const url = new URL("/v1/blobs", publisher);
-    url.searchParams.set("epochs", process.env.WALRUS_STORAGE_EPOCHS ?? "5");
+    try {
+      const url = new URL("/v1/blobs", publisher);
+      url.searchParams.set("epochs", process.env.WALRUS_STORAGE_EPOCHS ?? "5");
 
-    const response = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": contentType,
-      },
-      body: Buffer.from(bytes),
-    });
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": contentType,
+        },
+        body: Buffer.from(bytes),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Walrus upload failed with HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Walrus upload failed with HTTP ${response.status}`);
+      }
+
+      const payload: unknown = await response.json();
+      const blobId = extractWalrusBlobId(payload);
+
+      if (!blobId) {
+        throw new Error("Walrus upload succeeded without a blob id");
+      }
+
+      return {
+        blobId,
+        url: walrusBlobUrl(blobId),
+        filename: file.name,
+        contentType,
+        size: file.size,
+        visibility,
+        source: "walrus",
+      };
+    } catch {
+      // Fall through to local persistence so the app remains usable offline.
     }
-
-    const payload: unknown = await response.json();
-    const blobId = extractWalrusBlobId(payload);
-
-    if (!blobId) {
-      throw new Error("Walrus upload succeeded without a blob id");
-    }
-
-    return {
-      blobId,
-      url: walrusBlobUrl(blobId),
-      filename: file.name,
-      contentType,
-      size: file.size,
-      visibility,
-      source: "walrus",
-    };
   }
 
   const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
-  const blobId = `demo_${visibility}_${digest}`;
-
-  setDemoBlob({
-    blobId,
-    bytes,
+  const blobId = `local_${visibility}_${digest}`;
+  await setLocalBlob(blobId, bytes, {
     contentType,
     filename: file.name,
     visibility,
@@ -111,32 +175,32 @@ export async function storeWalrusBlob({
     contentType,
     size: file.size,
     visibility,
-    source: "demo",
+    source: "local",
   };
 }
 
-export function getPublicDemoWalrusBlob(blobId: string) {
-  const blob = getDemoBlob(blobId);
+export async function getPublicLocalWalrusBlob(blobId: string) {
+  const blob = await getLocalBlob(blobId);
 
-  if (!blob || blob.visibility !== "public") {
+  if (!blob || blob.meta.visibility !== "public") {
     return null;
   }
 
   return new Response(bytesToArrayBuffer(blob.bytes), {
     headers: {
-      "Content-Type": blob.contentType,
+      "Content-Type": blob.meta.contentType,
     },
   });
 }
 
 export async function readProtectedWalrusBlob(blobId: string) {
-  const demoBlob = getDemoBlob(blobId);
+  const localBlob = await getLocalBlob(blobId);
 
-  if (demoBlob) {
-    return new Response(bytesToArrayBuffer(demoBlob.bytes), {
+  if (localBlob) {
+    return new Response(bytesToArrayBuffer(localBlob.bytes), {
       headers: {
-        "Content-Type": demoBlob.contentType,
-        "Content-Length": String(demoBlob.bytes.byteLength),
+        "Content-Type": localBlob.meta.contentType,
+        "Content-Length": String(localBlob.bytes.byteLength),
       },
     });
   }

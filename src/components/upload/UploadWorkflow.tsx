@@ -9,13 +9,14 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import type { TransactionSpec, UploadReceipt } from "@/lib/blobpass/types";
 
 type UploadResponse = {
   success: true;
   ok: true;
-  source: string;
+  source: UploadReceipt["source"];
   previewBlobId: string | null;
   rawFileBlobId: string;
   previewUrl: string | null;
@@ -32,6 +33,10 @@ type UploadResponse = {
     };
   };
   transaction: TransactionSpec;
+  nativeSui: {
+    configured: boolean;
+    missing: string[];
+  };
 };
 
 const flow = [
@@ -49,12 +54,12 @@ export function UploadWorkflow() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Digital Asset");
   const [priceSui, setPriceSui] = useState("1");
-  const [status, setStatus] = useState<"idle" | "uploading" | "ready" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "uploading" | "stored" | "error">("idle");
   const [response, setResponse] = useState<UploadResponse | null>(null);
   const [error, setError] = useState("");
 
   const activeStep = useMemo(() => {
-    if (status === "ready") {
+    if (status === "stored") {
       return 3;
     }
 
@@ -115,7 +120,7 @@ export function UploadWorkflow() {
       }
 
       setResponse(payload as UploadResponse);
-      setStatus("ready");
+      setStatus("stored");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
       setStatus("error");
@@ -127,8 +132,8 @@ export function UploadWorkflow() {
       <div className="grid gap-4 md:grid-cols-4">
         {flow.map((step, index) => {
           const Icon = step.icon;
-          const complete = index < activeStep || status === "ready";
-          const active = index === activeStep && status !== "ready";
+          const complete = index < activeStep || status === "stored";
+          const active = index === activeStep && status !== "stored";
 
           return (
             <div className="relative text-center" key={step.label}>
@@ -157,7 +162,9 @@ export function UploadWorkflow() {
         <div className="flex items-center justify-between border-b border-white/10 p-8">
           <div>
             <h2 className="title text-2xl">Create Access Pass</h2>
-            <p className="mt-2 text-zinc-400">Store the asset on Walrus and produce the Sui kiosk transaction.</p>
+            <p className="mt-2 text-zinc-400">
+              Store the asset, publish the preview, and register a live marketplace listing.
+            </p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-full border border-cyan-300/40 bg-cyan-300/10 text-cyan-300">
             {activeStep + 1}
@@ -250,7 +257,7 @@ export function UploadWorkflow() {
             </div>
 
             <button className="button-primary min-h-14 w-full text-base" disabled={status === "uploading"} type="submit">
-              {status === "uploading" ? "Uploading..." : "Store, Mint & List"}
+              {status === "uploading" ? "Uploading..." : "Store & List Asset"}
               <ArrowRight size={20} />
             </button>
 
@@ -264,12 +271,26 @@ export function UploadWorkflow() {
 
             {response ? (
               <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/8 p-5 text-sm text-zinc-300">
-                <div className="mb-3 font-black text-cyan-300">Pass Ready</div>
+                <div className="mb-3 font-black text-cyan-300">Listing Live</div>
                 <div className="grid gap-2">
                   <span>Object: {response.passDraft.id}</span>
                   <span>Hidden blob: {response.rawFileBlobId}</span>
                   <span>Preview blob: {response.previewBlobId ?? "none"}</span>
-                  <span>PTB calls: {response.transaction.calls.length}</span>
+                  <span>Storage: {response.source === "walrus" ? "Walrus testnet" : "Local fallback store"}</span>
+                  <span>Transaction spec: {response.transaction.calls.length} prepared calls</span>
+                </div>
+                <p className="mt-4 leading-6 text-zinc-300">
+                  {response.nativeSui.configured
+                    ? "Blob metadata is registered and the wallet transaction spec is prepared. Final native Sui execution still depends on your deployed Move entrypoints and kiosk objects."
+                    : `BlobPass is running in registry mode right now. Add ${response.nativeSui.missing.join(", ")} to move minting and kiosk listing fully on-chain.`}
+                </p>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <Link className="button-primary min-h-11 flex-1 justify-center" href="/marketplace">
+                    View Marketplace
+                  </Link>
+                  <Link className="button-secondary min-h-11 flex-1 justify-center" href="/library">
+                    Open My Library
+                  </Link>
                 </div>
               </div>
             ) : null}

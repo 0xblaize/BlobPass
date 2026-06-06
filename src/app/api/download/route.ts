@@ -55,7 +55,9 @@ async function streamDownload({
   }
 
   const upstream = await readProtectedWalrusBlob(hiddenBlobId);
-  const filename = `${sanitizeFilename(pass.content.fields.title)}.bin`;
+  const filename = pass.assetFilename
+    ? pass.assetFilename.replace(/[\r\n"]/g, "").trim()
+    : `${sanitizeFilename(pass.content.fields.title)}.bin`;
   const headers = new Headers(upstream.headers);
 
   headers.set("Content-Type", pass.content.fields.file_type || "application/octet-stream");

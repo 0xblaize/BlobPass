@@ -1,6 +1,8 @@
-export type BlobPassRuntimeSource = "demo" | "walrus" | "tatum" | "hybrid";
+export type BlobPassRuntimeSource = "local" | "walrus" | "tatum" | "registry" | "hybrid";
 
 export type BlobVisibility = "public" | "hidden";
+
+export type AccessPassVerificationMode = "registry" | "tatum-object-owner";
 
 export type DataAccessPassFields = {
   title: string;
@@ -23,6 +25,10 @@ export type DataAccessPassObject = {
   purchases: number;
   gradient: string;
   listed: boolean;
+  source: BlobPassRuntimeSource;
+  storageSource: Extract<BlobPassRuntimeSource, "local" | "walrus">;
+  verificationMode: AccessPassVerificationMode;
+  assetFilename: string;
   content: {
     fields: DataAccessPassFields;
   };

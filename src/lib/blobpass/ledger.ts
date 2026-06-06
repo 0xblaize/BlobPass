@@ -1,20 +1,14 @@
+import { dateLabel, formatBytes, mistToSui, shortAddress, shortBlob } from "./format";
 import {
-  addDemoListing,
-  findDemoPassByBlobId,
-  getDemoPass,
-  listDemoInventory,
-  listDemoMarketplacePasses,
-  purchaseDemoPass,
-  verifyDemoOwnership,
-} from "./demo-store";
-import {
-  dateLabel,
-  DEMO_BUYER_ADDRESS,
-  formatBytes,
-  mistToSui,
-  shortAddress,
-  shortBlob,
-} from "./format";
+  createRegistryListing,
+  findRegistryPassByBlobId,
+  getRegistryPass,
+  getRegistrySellerEarnings,
+  listRegistryInventory,
+  listRegistryMarketplacePasses,
+  purchaseRegistryPass,
+  verifyRegistryOwnership,
+} from "./registry";
 import type {
   DataAccessPassFields,
   DataAccessPassObject,
@@ -30,15 +24,17 @@ type CreatePassInput = {
   description: string;
   category: string;
   priceMist: string;
+  assetFilename: string;
+  storageSource: "local" | "walrus";
   fields: DataAccessPassFields;
 };
 
 function getBlobPassPackageId() {
-  return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "0xblobpass_demo_package";
+  return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
 }
 
 function getPlatformKioskId() {
-  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "0xblobpass_demo_kiosk";
+  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
 }
 
 function getTatumRpcUrl() {
@@ -71,14 +67,15 @@ function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceLis
     previewBlobLabel: fields.preview_image_url ? "Public preview" : "Walrus preview pending",
     date: dateLabel(pass.createdAt),
     gradient: pass.gradient,
-    source: "demo",
+    source: pass.source,
   };
 }
 
 function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): LibraryAssetView {
   const fields = pass.content.fields;
-  const owned = pass.owner.toLowerCase() === address.toLowerCase();
-  const listedByUser = pass.listed && pass.seller.toLowerCase() === address.toLowerCase();
+  const normalizedAddress = address.toLowerCase();
+  const listedByUser = Boolean(address) && pass.listed && pass.seller.toLowerCase() === normalizedAddress;
+  const owned = Boolean(address) && !listedByUser && pass.owner.toLowerCase() === normalizedAddress;
 
   return {
     passId: pass.id,
@@ -95,25 +92,27 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
       : undefined,
     rawFileBlobId: owned ? fields.walrus_blob_id : undefined,
     previewImageUrl: fields.preview_image_url,
-    source: "demo",
+    source: pass.source,
   };
 }
 
 export function buildMintAndListTransactionSpec(pass: DataAccessPassObject): TransactionSpec {
   const fields = pass.content.fields;
+  const packageId = getBlobPassPackageId() || "NEXT_PUBLIC_BLOBPASS_PACKAGE_ID";
+  const platformKioskId = getPlatformKioskId() || "NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID";
 
   return {
     chain: "sui",
     title: `Mint and list ${fields.title}`,
     description:
       "Create the Data Access Pass object, insert it into the seller kiosk, and list it for purchase.",
-    packageId: getBlobPassPackageId(),
+    packageId,
     kioskId: pass.sellerKioskId,
     requiresWalletSignature: true,
     calls: [
       {
         kind: "moveCall",
-        target: `${getBlobPassPackageId()}::access_pass::mint`,
+        target: `${packageId}::access_pass::mint`,
         arguments: {
           title: fields.title,
           description: fields.description,
@@ -129,7 +128,7 @@ export function buildMintAndListTransactionSpec(pass: DataAccessPassObject): Tra
         arguments: {
           kiosk: pass.sellerKioskId,
           price_mist: pass.priceMist,
-          platform_kiosk: getPlatformKioskId(),
+          platform_kiosk: platformKioskId,
         },
       },
     ],
@@ -137,12 +136,13 @@ export function buildMintAndListTransactionSpec(pass: DataAccessPassObject): Tra
 }
 
 export function buildPurchaseTransactionSpec(pass: DataAccessPassObject): TransactionSpec {
+  const packageId = getBlobPassPackageId() || "NEXT_PUBLIC_BLOBPASS_PACKAGE_ID";
   return {
     chain: "sui",
     title: `Purchase ${pass.content.fields.title}`,
     description:
       "Buy the listed access pass from the seller kiosk and transfer the pass object into the buyer kiosk.",
-    packageId: getBlobPassPackageId(),
+    packageId,
     kioskId: pass.listingKioskId,
     requiresWalletSignature: true,
     calls: [
@@ -160,11 +160,13 @@ export function buildPurchaseTransactionSpec(pass: DataAccessPassObject): Transa
 }
 
 export async function getMarketplaceListings() {
-  return listDemoMarketplacePasses().map(mapPassToMarketplaceListing);
+  const passes = await listRegistryMarketplacePasses();
+  return passes.map(mapPassToMarketplaceListing);
 }
 
-export async function getLibraryAssets(address = DEMO_BUYER_ADDRESS) {
-  return listDemoInventory(address).map((pass) => mapPassToLibraryAsset(pass, address));
+export async function getLibraryAssets(address = "") {
+  const passes = await listRegistryInventory(address);
+  return passes.map((pass) => mapPassToLibraryAsset(pass, address));
 }
 
 export function getLibraryStats(assets: LibraryAssetView[]): LibraryStats {
@@ -174,12 +176,27 @@ export function getLibraryStats(assets: LibraryAssetView[]): LibraryStats {
   return {
     ownedAssets: String(owned),
     activeListings: String(activeListings),
-    totalEarnings: `${activeListings * 25}.00 SUI`,
+    totalEarnings: activeListings > 0 ? `${activeListings * 25}.00 SUI` : "0.00 SUI",
+  };
+}
+
+export async function getLibraryStatsForAddress(address: string): Promise<LibraryStats> {
+  const assets = await getLibraryAssets(address);
+  const earnings = await getRegistrySellerEarnings(address);
+  const activeListings = assets.filter((asset) => asset.status === "Your Listing").length;
+  const owned = assets.filter((asset) => asset.status === "Owned").length;
+
+  return {
+    ownedAssets: String(owned),
+    activeListings: String(activeListings),
+    totalEarnings: `${mistToSui(earnings)} SUI`,
   };
 }
 
 export async function createAccessPassListing(input: CreatePassInput) {
-  const pass = addDemoListing(input);
+  const pass = await createRegistryListing({
+    ...input,
+  });
 
   return {
     pass,
@@ -189,14 +206,14 @@ export async function createAccessPassListing(input: CreatePassInput) {
 }
 
 export async function purchaseAccessPass(passId: string, buyerAddress: string) {
-  const beforePurchase = getDemoPass(passId);
+  const beforePurchase = await getRegistryPass(passId);
 
   if (!beforePurchase) {
     return null;
   }
 
   const transaction = buildPurchaseTransactionSpec(beforePurchase);
-  const pass = purchaseDemoPass(passId, buyerAddress);
+  const pass = await purchaseRegistryPass(passId, buyerAddress);
 
   if (!pass) {
     return null;
@@ -210,18 +227,41 @@ export async function purchaseAccessPass(passId: string, buyerAddress: string) {
 }
 
 export async function getDataAccessPass(passId: string) {
-  return getDemoPass(passId);
+  return getRegistryPass(passId);
 }
 
 export async function getDataAccessPassByBlobId(blobId: string) {
-  return findDemoPassByBlobId(blobId);
+  return findRegistryPassByBlobId(blobId);
+}
+
+export function getNativeSuiConfig() {
+  const missing: string[] = [];
+
+  if (!getBlobPassPackageId()) {
+    missing.push("NEXT_PUBLIC_BLOBPASS_PACKAGE_ID");
+  }
+
+  if (!getPlatformKioskId()) {
+    missing.push("NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID");
+  }
+
+  return {
+    configured: missing.length === 0,
+    missing,
+  };
 }
 
 export async function verifyAccessPassOwnership(address: string, passId: string) {
+  const registryPass = await getRegistryPass(passId);
+
+  if (registryPass?.verificationMode === "registry") {
+    return verifyRegistryOwnership(address, passId);
+  }
+
   const tatumRpcUrl = getTatumRpcUrl();
 
   if (!process.env.TATUM_SUI_RPC_URL && !process.env.NEXT_PUBLIC_TATUM_SUI_RPC) {
-    return verifyDemoOwnership(address, passId);
+    return false;
   }
 
   const response = await fetch(tatumRpcUrl, {

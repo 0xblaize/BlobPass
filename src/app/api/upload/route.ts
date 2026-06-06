@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAccessPassListing } from "@/lib/blobpass/ledger";
+import { createAccessPassListing, getNativeSuiConfig } from "@/lib/blobpass/ledger";
 import { DEMO_SELLER_ADDRESS, suiToMist } from "@/lib/blobpass/format";
 import { storeWalrusBlob } from "@/lib/blobpass/walrus";
 
@@ -62,6 +62,8 @@ export async function POST(request: NextRequest) {
       description,
       category,
       priceMist,
+      assetFilename: assetFile.name,
+      storageSource: rawUpload.source === "walrus" ? "walrus" : "local",
       fields: {
         title,
         description,
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
       passDraft: pass,
       listing,
       transaction,
+      nativeSui: getNativeSuiConfig(),
     });
   } catch (error) {
     return NextResponse.json(

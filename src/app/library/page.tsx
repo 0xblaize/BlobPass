@@ -1,10 +1,10 @@
 import { Footer, Header, StackPills } from "@/components/chrome";
 import { LibraryGrid } from "@/components/library/LibraryGrid";
-import { DEMO_BUYER_ADDRESS } from "@/lib/blobpass/format";
-import { getLibraryAssets, getLibraryStats } from "@/lib/blobpass/ledger";
+import { getLibraryStats } from "@/lib/blobpass/ledger";
+import type { LibraryAssetView } from "@/lib/blobpass/types";
 
 export default async function LibraryPage() {
-  const assets = await getLibraryAssets(DEMO_BUYER_ADDRESS);
+  const assets: LibraryAssetView[] = [];
   const stats = getLibraryStats(assets);
 
   return (

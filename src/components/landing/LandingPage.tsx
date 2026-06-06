@@ -1,18 +1,18 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  Upload,
-  Zap,
+  CheckCircle,
   Database,
   ShieldCheck,
-  CheckCircle,
+  Upload,
+  Zap,
 } from "lucide-react";
-import { Header, Footer, StackPills } from "@/components/chrome";
-import { RabbitScene } from "./RabbitScene";
 import { ListingCard } from "@/components/cards";
-import { AccessControlSection } from "./AccessControlSection";
-import { TerminalSection } from "./TerminalSection";
+import { Footer, Header, StackPills } from "@/components/chrome";
 import { getMarketplaceListings } from "@/lib/blobpass/ledger";
+import { AccessControlSection } from "./AccessControlSection";
+import { RabbitScene } from "./RabbitScene";
+import { TerminalSection } from "./TerminalSection";
 
 export async function LandingPage() {
   const listings = await getMarketplaceListings();
@@ -22,7 +22,6 @@ export async function LandingPage() {
       <div className="relative min-h-screen overflow-hidden bg-black">
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.98)_0%,rgba(0,0,0,0.96)_46%,rgba(0,22,20,0.82)_100%)]" />
         <Header landing />
-        {/* --- HERO SECTION --- */}
         <main className="relative z-10 mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[1280px] items-center px-4">
           <section className="grid w-full grid-cols-1 items-center justify-center gap-7 py-10 lg:grid-cols-[minmax(300px,390px)_56px_minmax(440px,580px)] lg:gap-9">
             <div className="relative flex min-h-[350px] items-center justify-center lg:min-h-[540px]">
@@ -43,13 +42,18 @@ export async function LandingPage() {
                 on <span className="text-cyan-300">Walrus</span>
               </h1>
               <p className="mt-5 max-w-[590px] text-lg leading-snug text-zinc-400 lg:text-xl">
-                The first premium marketplace for the Sui ecosystem. Monetize
-                your code, designs, and data with immutable, decentralized
-                storage.
+                The first premium marketplace for the Sui ecosystem. Monetize your code,
+                designs, and data with durable, decentralized storage.
               </p>
               <div className="mt-12 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
                 <Link
-                  className="inline-flex min-h-14 min-w-[180px] items-center justify-center gap-3 rounded-full border border-cyan-300/65 bg-black/45 px-9 text-base font-extrabold text-white transition hover:border-cyan-200 hover:text-cyan-200"
+                  className="inline-flex min-h-14 min-w-[190px] items-center justify-center gap-3 rounded-full border border-cyan-300/70 bg-cyan-300 px-9 text-base font-extrabold text-black shadow-[0_0_36px_rgba(34,211,238,0.18)] transition hover:translate-y-[-1px] hover:border-cyan-200 hover:bg-cyan-200"
+                  href="/marketplace"
+                >
+                  <ArrowRight size={18} /> Marketplace
+                </Link>
+                <Link
+                  className="inline-flex min-h-14 min-w-[190px] items-center justify-center gap-3 rounded-full border border-cyan-300/40 bg-black/55 px-9 text-base font-extrabold text-white transition hover:translate-y-[-1px] hover:border-cyan-200 hover:text-cyan-200"
                   href="/upload"
                 >
                   <Upload size={18} /> Upload File
@@ -71,45 +75,60 @@ export async function LandingPage() {
       <hr className="border-white/10 opacity-30" />
 
       <main>
-        {/* --- ACCESS CONTROL SECTION --- */}
         <div className="border-b border-white/10">
           <AccessControlSection />
         </div>
 
-        {/* --- HOW IT WORKS SECTION --- */}
-        <div className="border-y border-white/10">
+        <div className="border-y border-white/10" id="how">
           <TerminalSection />
         </div>
 
-        {/* --- MARKETPLACE PREVIEW SECTION --- */}
-        <section className="shell space-y-10 py-32">
+        <section className="shell space-y-10 py-32" id="marketplace-preview">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <span className="chip mb-4 text-[10px] px-3 py-1 font-bold tracking-wider">
+              <span className="chip mb-4 px-3 py-1 text-[10px] font-bold tracking-wider">
                 TRENDING NOW
               </span>
-              <h2 className="title text-[22px] uppercase tracking-widest">
-                Marketplace Preview
-              </h2>
+              <h2 className="title text-[22px] uppercase tracking-widest">Marketplace Preview</h2>
             </div>
             <Link
-              className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2"
+              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-cyan-300"
               href="/marketplace"
             >
               Browse All Listings <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {listings.slice(0, 4).map((item) => (
-              <ListingCard item={item} key={item.passId} />
-            ))}
-          </div>
+
+          {listings.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+              {listings.slice(0, 4).map((item) => (
+                <ListingCard item={item} key={item.passId} />
+              ))}
+            </div>
+          ) : (
+            <div className="panel rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
+              <div className="mx-auto max-w-2xl">
+                <h3 className="title text-2xl text-white">Marketplace opens with the first live listing.</h3>
+                <p className="mt-4 text-sm leading-7 text-zinc-400">
+                  Upload a file, register the access pass, and your Walrus-backed asset will appear
+                  here without any seeded placeholder cards.
+                </p>
+                <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+                  <Link className="button-primary min-h-12 min-w-[190px] rounded-full" href="/marketplace">
+                    <ArrowRight size={18} /> Marketplace
+                  </Link>
+                  <Link className="button-secondary min-h-12 min-w-[190px] rounded-full" href="/upload">
+                    <Upload size={18} /> Upload File
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* --- VALUE PROPOSITION SECTION --- */}
-        <section id="stack" className="shell grid gap-8 md:grid-cols-2 py-10">
+        <section className="shell grid gap-8 py-10 md:grid-cols-2" id="stack">
           <div className="panel rounded-3xl p-12">
-            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl bg-cyan-950/30 text-cyan-400 border border-cyan-900/50">
+            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl border border-cyan-900/50 bg-cyan-950/30 text-cyan-400">
               <Zap size={18} />
             </div>
             <h2 className="title text-3xl leading-snug">
@@ -119,57 +138,37 @@ export async function LandingPage() {
             </h2>
             <ul className="mt-12 space-y-8">
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Upload once
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    Any file format up to any size — PDF, ZIP, MP4.
+                  <div className="text-[13px] font-bold text-white">Upload once</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    Any file format from PDFs to ZIP archives and MP4 releases.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Get your price in SUI
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
+                  <div className="text-[13px] font-bold text-white">Get your price in SUI</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
                     You keep 100% of every sale, instantly.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Your file stays yours
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    The blob stays on Walrus forever — delist freely.
+                  <div className="text-[13px] font-bold text-white">Your file stays yours</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    The blob stays on Walrus while you control the access listing.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Earnings on-chain
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
+                  <div className="text-[13px] font-bold text-white">Earnings on-chain</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
                     Direct wallet settlement with zero intermediaries.
                   </div>
                 </div>
@@ -178,7 +177,7 @@ export async function LandingPage() {
           </div>
 
           <div className="panel rounded-3xl p-12">
-            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl bg-cyan-950/30 text-cyan-400 border border-cyan-900/50">
+            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl border border-cyan-900/50 bg-cyan-950/30 text-cyan-400">
               <ShieldCheck size={18} />
             </div>
             <h2 className="title text-3xl leading-snug">
@@ -188,58 +187,38 @@ export async function LandingPage() {
             </h2>
             <ul className="mt-12 space-y-8">
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    No subscriptions
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    One transaction — the access pass is yours permanently.
+                  <div className="text-[13px] font-bold text-white">No subscriptions</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    One transaction, and the access pass is yours permanently.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Verified ownership
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    Tatum RPC confirms your Kiosk object before every download.
+                  <div className="text-[13px] font-bold text-white">Verified ownership</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    BlobPass checks ownership before every protected download.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Instant access
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    Blob retrieved directly from the Walrus aggregator network.
+                  <div className="text-[13px] font-bold text-white">Instant access</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    Protected blobs stream directly to the buyer after verification passes.
                   </div>
                 </div>
               </li>
               <li className="flex gap-4">
-                <CheckCircle
-                  size={16}
-                  className="text-cyan-400 shrink-0 mt-1"
-                />
+                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
                 <div>
-                  <div className="text-[13px] font-bold text-white">
-                    Works with any Sui wallet
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
-                    Sui Wallet, Surf, Ethos — just connect and pay.
+                  <div className="text-[13px] font-bold text-white">Works with any Sui wallet</div>
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                    Sui Wallet, Surf, Ethos, and other Wallet Standard apps can connect directly.
                   </div>
                 </div>
               </li>
@@ -247,33 +226,28 @@ export async function LandingPage() {
           </div>
         </section>
 
-        {/* --- CALL TO ACTION SECTION --- */}
-        <section id="for" className="shell py-32">
-          <div className="panel mx-auto max-w-[900px] rounded-[40px] p-20 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyan-400/10 blur-[100px] rounded-full pointer-events-none" />
-            <div className="mx-auto mb-10 grid h-16 w-16 place-items-center rounded-2xl bg-cyan-300 text-black relative z-10">
+        <section className="shell py-32" id="for">
+          <div className="panel relative mx-auto max-w-[900px] overflow-hidden rounded-[40px] p-20 text-center">
+            <div className="pointer-events-none absolute left-1/2 top-0 h-[300px] w-[600px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[100px]" />
+            <div className="relative z-10 mx-auto mb-10 grid h-16 w-16 place-items-center rounded-2xl bg-cyan-300 text-black">
               <Database size={28} />
             </div>
-            <h2 className="title text-[32px] uppercase tracking-widest max-w-[640px] mx-auto leading-snug relative z-10">
+            <h2 className="title relative z-10 mx-auto max-w-[640px] text-[32px] uppercase tracking-widest leading-snug">
               Start Selling Files on Walrus Today
             </h2>
-            <p className="mx-auto mt-6 max-w-lg text-[11px] leading-6 text-zinc-500 uppercase tracking-widest relative z-10">
-              Join the growing ecosystem of creators and builders monetizing
-              their digital assets on the world&apos;s first decentralized file
-              marketplace.
+            <p className="relative z-10 mx-auto mt-6 max-w-lg text-[11px] uppercase tracking-widest leading-6 text-zinc-500">
+              Join the growing ecosystem of creators and builders monetizing their digital assets
+              on the world&apos;s first decentralized file marketplace.
             </p>
-            <div className="mt-14 flex flex-wrap justify-center gap-6 relative z-10">
-              <Link className="button-primary min-w-[220px]" href="/upload">
-                Upload My First File
-              </Link>
-              <Link
-                className="button-secondary min-w-[220px]"
-                href="/marketplace"
-              >
+            <div className="relative z-10 mt-14 flex flex-wrap justify-center gap-6">
+              <Link className="button-primary min-w-[220px]" href="/marketplace">
                 Explore Marketplace
               </Link>
+              <Link className="button-secondary min-w-[220px]" href="/upload">
+                Upload My First File
+              </Link>
             </div>
-            <div className="mt-16 flex justify-center opacity-40 grayscale relative z-10">
+            <div className="relative z-10 mt-16 flex justify-center opacity-40 grayscale">
               <StackPills />
             </div>
           </div>
