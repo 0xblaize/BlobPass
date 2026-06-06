@@ -1,12 +1,13 @@
 import { dateLabel, formatBytes, mistToSui, shortAddress, shortBlob } from "./format";
 import {
-  createRegistryListing,
   findRegistryPassByBlobId,
   getRegistryPass,
+  getRegistryPassByListingId,
   getRegistrySellerEarnings,
+  indexRegistryListing,
   listRegistryInventory,
   listRegistryMarketplacePasses,
-  purchaseRegistryPass,
+  syncRegistryPurchase,
   verifyRegistryOwnership,
 } from "./registry";
 import type {
@@ -15,7 +16,6 @@ import type {
   LibraryAssetView,
   LibraryStats,
   MarketplaceListing,
-  TransactionSpec,
 } from "./types";
 
 type CreatePassInput = {
@@ -50,14 +50,14 @@ function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceLis
   const fields = pass.content.fields;
 
   return {
-    id: pass.id,
+    id: pass.listingId,
     passId: pass.id,
+    listingId: pass.listingId,
+    listingInitialSharedVersion: pass.listingInitialSharedVersion,
     title: fields.title,
     category: pass.category,
     description: fields.description,
     seller: shortAddress(pass.seller),
-    sellerKioskId: pass.sellerKioskId,
-    listingKioskId: pass.listingKioskId,
     price: mistToSui(pass.priceMist),
     priceMist: pass.priceMist,
     size: formatBytes(fields.file_size),
@@ -79,6 +79,7 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
 
   return {
     passId: pass.id,
+    listingId: pass.listingId,
     title: fields.title,
     category: pass.category,
     status: owned ? "Owned" : listedByUser ? "Your Listing" : "Locked",
@@ -93,69 +94,6 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
     rawFileBlobId: owned ? fields.walrus_blob_id : undefined,
     previewImageUrl: fields.preview_image_url,
     source: pass.source,
-  };
-}
-
-export function buildMintAndListTransactionSpec(pass: DataAccessPassObject): TransactionSpec {
-  const fields = pass.content.fields;
-  const packageId = getBlobPassPackageId() || "NEXT_PUBLIC_BLOBPASS_PACKAGE_ID";
-  const platformKioskId = getPlatformKioskId() || "NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID";
-
-  return {
-    chain: "sui",
-    title: `Mint and list ${fields.title}`,
-    description:
-      "Create the Data Access Pass object, insert it into the seller kiosk, and list it for purchase.",
-    packageId,
-    kioskId: pass.sellerKioskId,
-    requiresWalletSignature: true,
-    calls: [
-      {
-        kind: "moveCall",
-        target: `${packageId}::access_pass::mint`,
-        arguments: {
-          title: fields.title,
-          description: fields.description,
-          file_size: fields.file_size,
-          file_type: fields.file_type,
-          preview_image_url: fields.preview_image_url,
-          walrus_blob_id: fields.walrus_blob_id,
-        },
-      },
-      {
-        kind: "kioskAction",
-        target: "0x2::kiosk::place_and_list",
-        arguments: {
-          kiosk: pass.sellerKioskId,
-          price_mist: pass.priceMist,
-          platform_kiosk: platformKioskId,
-        },
-      },
-    ],
-  };
-}
-
-export function buildPurchaseTransactionSpec(pass: DataAccessPassObject): TransactionSpec {
-  const packageId = getBlobPassPackageId() || "NEXT_PUBLIC_BLOBPASS_PACKAGE_ID";
-  return {
-    chain: "sui",
-    title: `Purchase ${pass.content.fields.title}`,
-    description:
-      "Buy the listed access pass from the seller kiosk and transfer the pass object into the buyer kiosk.",
-    packageId,
-    kioskId: pass.listingKioskId,
-    requiresWalletSignature: true,
-    calls: [
-      {
-        kind: "kioskAction",
-        target: "0x2::kiosk::purchase",
-        arguments: {
-          kiosk: pass.listingKioskId,
-          pass_object_id: pass.id,
-          price_mist: pass.priceMist,
-        },
-      },
-    ],
   };
 }
 
@@ -193,27 +131,45 @@ export async function getLibraryStatsForAddress(address: string): Promise<Librar
   };
 }
 
-export async function createAccessPassListing(input: CreatePassInput) {
-  const pass = await createRegistryListing({
+type IndexAccessPassInput = CreatePassInput & {
+  passId: string;
+  listingId: string;
+  listingInitialSharedVersion?: string;
+  transactionDigest?: string;
+};
+
+export async function indexAccessPassListing(input: IndexAccessPassInput) {
+  const pass = await indexRegistryListing({
     ...input,
+    passId: input.passId,
+    listingId: input.listingId,
+    listingInitialSharedVersion: input.listingInitialSharedVersion,
+    transactionDigest: input.transactionDigest,
   });
 
   return {
     pass,
     listing: mapPassToMarketplaceListing(pass),
-    transaction: buildMintAndListTransactionSpec(pass),
   };
 }
 
-export async function purchaseAccessPass(passId: string, buyerAddress: string) {
-  const beforePurchase = await getRegistryPass(passId);
-
-  if (!beforePurchase) {
-    return null;
-  }
-
-  const transaction = buildPurchaseTransactionSpec(beforePurchase);
-  const pass = await purchaseRegistryPass(passId, buyerAddress);
+export async function syncPurchasedAccessPass({
+  listingId,
+  buyerAddress,
+  passId,
+  transactionDigest,
+}: {
+  listingId: string;
+  buyerAddress: string;
+  passId?: string;
+  transactionDigest?: string;
+}) {
+  const pass = await syncRegistryPurchase({
+    listingId,
+    buyerAddress,
+    passId,
+    transactionDigest,
+  });
 
   if (!pass) {
     return null;
@@ -222,7 +178,6 @@ export async function purchaseAccessPass(passId: string, buyerAddress: string) {
   return {
     pass,
     asset: mapPassToLibraryAsset(pass, buyerAddress),
-    transaction,
   };
 }
 
@@ -232,6 +187,10 @@ export async function getDataAccessPass(passId: string) {
 
 export async function getDataAccessPassByBlobId(blobId: string) {
   return findRegistryPassByBlobId(blobId);
+}
+
+export async function getDataAccessPassByListingId(listingId: string) {
+  return getRegistryPassByListingId(listingId);
 }
 
 export function getNativeSuiConfig() {

@@ -1,6 +1,11 @@
 "use client";
 
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+  useSuiClient,
+} from "@mysten/dapp-kit";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   Download,
@@ -10,6 +15,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { useState } from "react";
+import {
+  buildBuyListingTransaction,
+  getListingPurchasedEvent,
+  getTransferredPassChange,
+} from "@/lib/blobpass/sui";
 import type { LibraryAssetView, MarketplaceListing } from "@/lib/blobpass/types";
 
 function PreviewImage({
@@ -42,6 +52,9 @@ function PreviewImage({
 
 function usePurchase(item: MarketplaceListing) {
   const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const queryClient = useQueryClient();
+  const signAndExecute = useSignAndExecuteTransaction();
   const [state, setState] = useState<"idle" | "buying" | "owned" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -56,12 +69,37 @@ function usePurchase(item: MarketplaceListing) {
     setErrorMessage("");
 
     try {
+      const transaction = buildBuyListingTransaction({
+        listingId: item.listingId,
+        priceMist: item.priceMist,
+        listingInitialSharedVersion: item.listingInitialSharedVersion,
+      });
+
+      const txResult = await signAndExecute.mutateAsync({
+        transaction,
+      });
+
+      const finalized = await suiClient.waitForTransaction({
+        digest: txResult.digest,
+        options: {
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      const purchasedEvent = getListingPurchasedEvent(finalized);
+      const transferredPass = getTransferredPassChange(finalized);
+      const passId =
+        purchasedEvent?.pass_id || (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : undefined);
+
       const response = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          passId: item.passId,
+          listingId: item.listingId,
+          passId,
           buyerAddress: account.address,
+          transactionDigest: txResult.digest,
         }),
       });
 
@@ -70,6 +108,7 @@ function usePurchase(item: MarketplaceListing) {
         throw new Error(payload?.error || "Purchase request failed");
       }
 
+      await queryClient.invalidateQueries({ queryKey: ["library"] });
       setState("owned");
     } catch (error) {
       setState("error");

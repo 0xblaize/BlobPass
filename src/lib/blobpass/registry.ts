@@ -55,10 +55,11 @@ function clonePass(pass: DataAccessPassObject): DataAccessPassObject {
 function normalizePassRecord(pass: DataAccessPassObject): DataAccessPassObject {
   return {
     ...pass,
+    id: pass.id || `registry-pass-${Date.now()}`,
+    listingId: pass.listingId || (pass as DataAccessPassObject & { listingKioskId?: string }).listingKioskId || pass.id,
+    listingInitialSharedVersion: pass.listingInitialSharedVersion || "",
     owner: pass.owner || pass.seller || DEMO_SELLER_ADDRESS,
     seller: pass.seller || DEMO_SELLER_ADDRESS,
-    sellerKioskId: pass.sellerKioskId || `registry-seller-${Date.now()}`,
-    listingKioskId: pass.listingKioskId || `registry-listing-${Date.now()}`,
     category: pass.category || "Digital Asset",
     priceMist: pass.priceMist || "0",
     createdAt: pass.createdAt || new Date().toISOString(),
@@ -160,6 +161,12 @@ export async function getRegistryPass(passId: string) {
   return pass ? clonePass(pass) : null;
 }
 
+export async function getRegistryPassByListingId(listingId: string) {
+  const registry = await readRegistry();
+  const pass = registry.passes.find((item) => item.listingId === listingId);
+  return pass ? clonePass(pass) : null;
+}
+
 export async function findRegistryPassByBlobId(blobId: string) {
   const registry = await readRegistry();
   const pass = registry.passes.find((item) => item.content.fields.walrus_blob_id === blobId);
@@ -183,10 +190,10 @@ export async function createRegistryListing(input: CreateRegistryListingInput) {
     const slug = slugify(input.title) || `asset-${sequence}`;
     const pass: DataAccessPassObject = {
       id: `0xpass_${slug}_${sequence}`,
+      listingId: `registry-listing-${sequence}`,
+      listingInitialSharedVersion: "",
       owner: seller,
       seller,
-      sellerKioskId: `registry-seller-${slugify(seller).slice(0, 18) || sequence}`,
-      listingKioskId: `registry-listing-${sequence}`,
       category: input.category,
       priceMist: input.priceMist,
       createdAt: new Date().toISOString(),
@@ -211,6 +218,55 @@ export async function createRegistryListing(input: CreateRegistryListingInput) {
   });
 }
 
+type IndexRegistryListingInput = CreateRegistryListingInput & {
+  passId: string;
+  listingId: string;
+  listingInitialSharedVersion?: string;
+  transactionDigest?: string;
+};
+
+export async function indexRegistryListing(input: IndexRegistryListingInput) {
+  return withRegistryWrite((registry) => {
+    const existingIndex = registry.passes.findIndex(
+      (item) => item.id === input.passId || item.listingId === input.listingId,
+    );
+    const existing = existingIndex >= 0 ? registry.passes[existingIndex] : null;
+    const seller = input.sellerAddress || existing?.seller || DEMO_SELLER_ADDRESS;
+    const nextPass: DataAccessPassObject = normalizePassRecord({
+      id: input.passId,
+      listingId: input.listingId,
+      listingInitialSharedVersion: input.listingInitialSharedVersion || existing?.listingInitialSharedVersion || "",
+      owner: existing?.owner || seller,
+      seller,
+      category: input.category,
+      priceMist: input.priceMist,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      purchases: existing?.purchases ?? 0,
+      gradient: existing?.gradient || gradientFor(registry.sequence),
+      listed: true,
+      source: registrySourceFor(input.storageSource),
+      storageSource: input.storageSource,
+      verificationMode: "tatum-object-owner",
+      assetFilename: input.assetFilename,
+      lastTransactionDigest: input.transactionDigest || existing?.lastTransactionDigest,
+      content: {
+        fields: {
+          ...input.fields,
+        },
+      },
+    });
+
+    if (existingIndex >= 0) {
+      registry.passes.splice(existingIndex, 1);
+    } else {
+      registry.sequence += 1;
+    }
+
+    registry.passes.unshift(nextPass);
+    return clonePass(nextPass);
+  });
+}
+
 export async function purchaseRegistryPass(passId: string, buyerAddress: string) {
   return withRegistryWrite((registry) => {
     const pass = registry.passes.find((item) => item.id === passId);
@@ -221,8 +277,41 @@ export async function purchaseRegistryPass(passId: string, buyerAddress: string)
 
     pass.listed = false;
     pass.owner = buyerAddress;
-    pass.listingKioskId = `registry-owner-${slugify(buyerAddress).slice(0, 18) || "buyer"}`;
     pass.purchases += 1;
+
+    return clonePass(pass);
+  });
+}
+
+export async function syncRegistryPurchase({
+  listingId,
+  buyerAddress,
+  passId,
+  transactionDigest,
+}: {
+  listingId: string;
+  buyerAddress: string;
+  passId?: string;
+  transactionDigest?: string;
+}) {
+  return withRegistryWrite((registry) => {
+    const pass = registry.passes.find(
+      (item) => item.listingId === listingId || (passId ? item.id === passId : false),
+    );
+
+    if (!pass) {
+      return null;
+    }
+
+    if (passId) {
+      pass.id = passId;
+    }
+
+    pass.listed = false;
+    pass.owner = buyerAddress;
+    pass.purchases += 1;
+    pass.verificationMode = "tatum-object-owner";
+    pass.lastTransactionDigest = transactionDigest || pass.lastTransactionDigest;
 
     return clonePass(pass);
   });

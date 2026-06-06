@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { purchaseAccessPass } from "@/lib/blobpass/ledger";
+import { syncPurchasedAccessPass } from "@/lib/blobpass/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +11,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid purchase request" }, { status: 400 });
     }
 
-    const { passId, buyerAddress } = body as {
+    const { listingId, passId, buyerAddress, transactionDigest } = body as {
+      listingId?: string;
       passId?: string;
       buyerAddress?: string;
+      transactionDigest?: string;
     };
 
-    if (!passId || !buyerAddress) {
+    if (!listingId || !buyerAddress) {
       return NextResponse.json(
-        { error: "passId and buyerAddress are required" },
+        { error: "listingId and buyerAddress are required" },
         { status: 400 },
       );
     }
 
-    const purchase = await purchaseAccessPass(passId, buyerAddress);
+    const purchase = await syncPurchasedAccessPass({
+      listingId,
+      buyerAddress,
+      passId,
+      transactionDigest,
+    });
 
     if (!purchase) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });

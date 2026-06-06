@@ -15,10 +15,10 @@ export type DataAccessPassFields = {
 
 export type DataAccessPassObject = {
   id: string;
+  listingId: string;
+  listingInitialSharedVersion?: string;
   owner: string;
   seller: string;
-  sellerKioskId: string;
-  listingKioskId: string;
   category: string;
   priceMist: string;
   createdAt: string;
@@ -29,6 +29,7 @@ export type DataAccessPassObject = {
   storageSource: Extract<BlobPassRuntimeSource, "local" | "walrus">;
   verificationMode: AccessPassVerificationMode;
   assetFilename: string;
+  lastTransactionDigest?: string;
   content: {
     fields: DataAccessPassFields;
   };
@@ -63,12 +64,12 @@ export type TransactionSpec = {
 export type MarketplaceListing = {
   id: string;
   passId: string;
+  listingId: string;
+  listingInitialSharedVersion?: string;
   title: string;
   category: string;
   description: string;
   seller: string;
-  sellerKioskId: string;
-  listingKioskId: string;
   price: string;
   priceMist: string;
   size: string;
@@ -83,6 +84,7 @@ export type MarketplaceListing = {
 
 export type LibraryAssetView = {
   passId: string;
+  listingId: string;
   title: string;
   category: string;
   status: "Owned" | "Your Listing" | "Locked";

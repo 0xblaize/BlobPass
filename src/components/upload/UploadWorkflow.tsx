@@ -1,6 +1,10 @@
 "use client";
 
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+  useSuiClient,
+} from "@mysten/dapp-kit";
 import {
   ArrowRight,
   CheckCircle,
@@ -11,7 +15,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
-import type { TransactionSpec, UploadReceipt } from "@/lib/blobpass/types";
+import { suiToMist } from "@/lib/blobpass/format";
+import {
+  buildCreateListingTransaction,
+  extractPassIdFromListingObject,
+  getCreatedListingChange,
+  getCreatedPassChange,
+  getInitialSharedVersionFromChange,
+  getListingCreatedEvent,
+} from "@/lib/blobpass/sui";
+import type { UploadReceipt } from "@/lib/blobpass/types";
 
 type UploadResponse = {
   success: true;
@@ -24,18 +37,33 @@ type UploadResponse = {
     rawFile: UploadReceipt;
     preview: UploadReceipt | null;
   };
-  passDraft: {
+  asset: {
+    title: string;
+    description: string;
+    category: string;
+    priceMist: string;
+    assetFilename: string;
+    sellerAddress: string;
+    file_size: string;
+    file_type: string;
+  };
+  nativeSui: {
+    configured: boolean;
+    missing: string[];
+  };
+};
+
+type IndexedListingResponse = {
+  ok: true;
+  pass: {
     id: string;
+    listingId: string;
+    listingInitialSharedVersion?: string;
     content: {
       fields: {
         walrus_blob_id: string;
       };
     };
-  };
-  transaction: TransactionSpec;
-  nativeSui: {
-    configured: boolean;
-    missing: string[];
   };
 };
 
@@ -48,14 +76,19 @@ const flow = [
 
 export function UploadWorkflow() {
   const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const signAndExecute = useSignAndExecuteTransaction();
   const [assetFile, setAssetFile] = useState<File | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Digital Asset");
   const [priceSui, setPriceSui] = useState("1");
-  const [status, setStatus] = useState<"idle" | "uploading" | "stored" | "error">("idle");
-  const [response, setResponse] = useState<UploadResponse | null>(null);
+  const [status, setStatus] = useState<
+    "idle" | "uploading" | "signing" | "confirming" | "stored" | "error"
+  >("idle");
+  const [response, setResponse] = useState<IndexedListingResponse | null>(null);
+  const [txDigest, setTxDigest] = useState("");
   const [error, setError] = useState("");
 
   const activeStep = useMemo(() => {
@@ -63,7 +96,7 @@ export function UploadWorkflow() {
       return 3;
     }
 
-    if (status === "uploading") {
+    if (status === "uploading" || status === "signing" || status === "confirming") {
       return 2;
     }
 
@@ -89,6 +122,8 @@ export function UploadWorkflow() {
 
     setStatus("uploading");
     setError("");
+    setResponse(null);
+    setTxDigest("");
 
     const formData = new FormData();
     formData.append("asset", assetFile);
@@ -119,7 +154,101 @@ export function UploadWorkflow() {
         );
       }
 
-      setResponse(payload as UploadResponse);
+      const uploadPayload = payload as UploadResponse;
+      const priceMist = uploadPayload.asset.priceMist || suiToMist(priceSui);
+
+      setStatus("signing");
+
+      const transaction = buildCreateListingTransaction({
+        title: uploadPayload.asset.title,
+        description: uploadPayload.asset.description,
+        fileSize: uploadPayload.asset.file_size,
+        fileType: uploadPayload.asset.file_type,
+        previewImageUrl: uploadPayload.previewUrl ?? "",
+        walrusBlobId: uploadPayload.rawFileBlobId,
+        priceMist,
+      });
+
+      const txResult = await signAndExecute.mutateAsync({
+        transaction,
+      });
+
+      setTxDigest(txResult.digest);
+      setStatus("confirming");
+
+      const finalized = await suiClient.waitForTransaction({
+        digest: txResult.digest,
+        options: {
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      const createdEvent = getListingCreatedEvent(finalized);
+      const listingChange = getCreatedListingChange(finalized);
+      const passChange = getCreatedPassChange(finalized);
+      const listingId =
+        createdEvent?.listing_id || (typeof listingChange?.objectId === "string" ? listingChange.objectId : "");
+      let passId =
+        createdEvent?.pass_id || (typeof passChange?.objectId === "string" ? passChange.objectId : "");
+      const listingInitialSharedVersion = getInitialSharedVersionFromChange(listingChange);
+
+      if (!passId && listingId) {
+        const listingObject = await suiClient.getObject({
+          id: listingId,
+          options: {
+            showContent: true,
+          },
+        });
+
+        passId = extractPassIdFromListingObject(listingObject);
+      }
+
+      if (!listingId || !passId) {
+        throw new Error(
+          "The listing transaction succeeded, but BlobPass could not read the created listing or pass IDs.",
+        );
+      }
+
+      const indexResponse = await fetch("/api/index-listing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sellerAddress: account.address,
+          title: uploadPayload.asset.title,
+          description: uploadPayload.asset.description,
+          category,
+          priceMist,
+          assetFilename: uploadPayload.asset.assetFilename,
+          storageSource: uploadPayload.source === "walrus" ? "walrus" : "local",
+          passId,
+          listingId,
+          listingInitialSharedVersion,
+          transactionDigest: txResult.digest,
+          fields: {
+            title: uploadPayload.asset.title,
+            description: uploadPayload.asset.description,
+            file_size: uploadPayload.asset.file_size,
+            file_type: uploadPayload.asset.file_type,
+            preview_image_url: uploadPayload.previewUrl ?? "",
+            walrus_blob_id: uploadPayload.rawFileBlobId,
+          },
+        }),
+      });
+
+      const indexedPayload = (await indexResponse.json()) as IndexedListingResponse | { error?: string };
+
+      if (!indexResponse.ok) {
+        throw new Error(
+          "error" in indexedPayload && indexedPayload.error
+            ? indexedPayload.error
+            : "BlobPass could not index the on-chain listing.",
+        );
+      }
+
+      setResponse(indexedPayload as IndexedListingResponse);
       setStatus("stored");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
@@ -256,8 +385,18 @@ export function UploadWorkflow() {
               </label>
             </div>
 
-            <button className="button-primary min-h-14 w-full text-base" disabled={status === "uploading"} type="submit">
-              {status === "uploading" ? "Uploading..." : "Store & List Asset"}
+            <button
+              className="button-primary min-h-14 w-full text-base"
+              disabled={status === "uploading" || status === "signing" || status === "confirming"}
+              type="submit"
+            >
+              {status === "uploading"
+                ? "Uploading..."
+                : status === "signing"
+                  ? "Awaiting Wallet Signature..."
+                  : status === "confirming"
+                    ? "Confirming On-Chain..."
+                    : "Store & List Asset"}
               <ArrowRight size={20} />
             </button>
 
@@ -273,16 +412,13 @@ export function UploadWorkflow() {
               <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/8 p-5 text-sm text-zinc-300">
                 <div className="mb-3 font-black text-cyan-300">Listing Live</div>
                 <div className="grid gap-2">
-                  <span>Object: {response.passDraft.id}</span>
-                  <span>Hidden blob: {response.rawFileBlobId}</span>
-                  <span>Preview blob: {response.previewBlobId ?? "none"}</span>
-                  <span>Storage: {response.source === "walrus" ? "Walrus testnet" : "Local fallback store"}</span>
-                  <span>Transaction spec: {response.transaction.calls.length} prepared calls</span>
+                  <span>Pass: {response.pass.id}</span>
+                  <span>Listing: {response.pass.listingId}</span>
+                  <span>Hidden blob: {response.pass.content.fields.walrus_blob_id}</span>
+                  <span>Transaction: {txDigest || "pending"}</span>
                 </div>
                 <p className="mt-4 leading-6 text-zinc-300">
-                  {response.nativeSui.configured
-                    ? "Blob metadata is registered and the wallet transaction spec is prepared. Final native Sui execution still depends on your deployed Move entrypoints and kiosk objects."
-                    : `BlobPass is running in registry mode right now. Add ${response.nativeSui.missing.join(", ")} to move minting and kiosk listing fully on-chain.`}
+                  The file is stored, the access pass is minted on Sui, and the marketplace cache has been updated with the real on-chain IDs.
                 </p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                   <Link className="button-primary min-h-11 flex-1 justify-center" href="/marketplace">

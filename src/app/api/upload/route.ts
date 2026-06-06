@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAccessPassListing, getNativeSuiConfig } from "@/lib/blobpass/ledger";
+import { getNativeSuiConfig } from "@/lib/blobpass/ledger";
 import { DEMO_SELLER_ADDRESS, suiToMist } from "@/lib/blobpass/format";
 import { storeWalrusBlob } from "@/lib/blobpass/walrus";
 
@@ -56,24 +56,6 @@ export async function POST(request: NextRequest) {
     const priceMist = suiToMist(formString(formData, "priceSui", "1"));
     const sellerAddress = formString(formData, "sellerAddress", DEMO_SELLER_ADDRESS);
 
-    const { pass, listing, transaction } = await createAccessPassListing({
-      sellerAddress,
-      title,
-      description,
-      category,
-      priceMist,
-      assetFilename: assetFile.name,
-      storageSource: rawUpload.source === "walrus" ? "walrus" : "local",
-      fields: {
-        title,
-        description,
-        file_size: String(assetFile.size),
-        file_type: assetFile.type || "application/octet-stream",
-        preview_image_url: previewUpload?.url ?? "",
-        walrus_blob_id: rawUpload.blobId,
-      },
-    });
-
     return NextResponse.json({
       ok: true,
       success: true,
@@ -85,9 +67,16 @@ export async function POST(request: NextRequest) {
         rawFile: rawUpload,
         preview: previewUpload,
       },
-      passDraft: pass,
-      listing,
-      transaction,
+      asset: {
+        title,
+        description,
+        category,
+        priceMist,
+        assetFilename: assetFile.name,
+        sellerAddress,
+        file_size: String(assetFile.size),
+        file_type: assetFile.type || "application/octet-stream",
+      },
       nativeSui: getNativeSuiConfig(),
     });
   } catch (error) {

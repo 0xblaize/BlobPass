@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import {
-  Blocks,
   Database,
   Library,
   Upload,
@@ -16,7 +15,7 @@ type NavProps = {
 };
 
 const nav = [
-  { href: "/marketplace", label: "Marketplace", key: "marketplace", icon: Blocks },
+
   { href: "/upload", label: "Upload", key: "upload", icon: Upload },
   { href: "/library", label: "My Library", key: "library", icon: Library },
 ] as const;
@@ -51,13 +50,7 @@ export function Header({ active, landing = false }: NavProps) {
             <a href="#for">Who It&apos;s For</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link
-              className="button-primary hide-mobile min-h-12 min-w-[170px] rounded-full px-7 text-base shadow-[0_0_28px_rgba(34,211,238,0.18)]"
-              href="/marketplace"
-            >
-              <Blocks size={18} /> Marketplace
-            </Link>
-            <Link
+                       <Link
               className="button-secondary hide-mobile min-h-12 min-w-[170px] rounded-full border-cyan-300/40 bg-black/70 px-7 text-base text-zinc-100"
               href="/upload"
             >
