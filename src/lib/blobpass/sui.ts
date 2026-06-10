@@ -27,12 +27,37 @@ export type ListingPurchasedEvent = {
   pass_id?: string;
 };
 
+export type BlobRegisteredEvent = {
+  blob_object_id?: string;
+  storage_start_epoch?: string | number;
+  storage_end_epoch?: string | number;
+  royalty_bps?: string | number;
+};
+
+export type AccessPointerMintedEvent = {
+  pass_id?: string;
+  royalty_paid_mist?: string | number;
+  storage_end_epoch?: string | number;
+};
+
 function getPackageId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
 }
 
 function getEcosystemId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
+}
+
+function getRegistryId() {
+  return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_ID || "";
+}
+
+function getWalrusTopUpTarget() {
+  return process.env.NEXT_PUBLIC_WALRUS_TOP_UP_TARGET || "";
+}
+
+function getWalrusSystemObjectId() {
+  return process.env.NEXT_PUBLIC_WALRUS_SYSTEM_OBJECT_ID || "";
 }
 
 function assertConfig() {
@@ -48,6 +73,22 @@ function assertConfig() {
   return {
     packageId,
     ecosystemId,
+  };
+}
+
+function assertRegistryConfig() {
+  const config = assertConfig();
+  const registryId = getRegistryId();
+
+  if (!registryId) {
+    throw new Error(
+      "BlobPass registry is not configured. Add NEXT_PUBLIC_BLOBPASS_REGISTRY_ID after publishing the upgraded Move package.",
+    );
+  }
+
+  return {
+    ...config,
+    registryId,
   };
 }
 
@@ -89,6 +130,40 @@ export function buildCreateListingTransaction(input: {
   return tx;
 }
 
+export function buildCreateRegisteredListingTransaction(input: {
+  title: string;
+  description: string;
+  fileSize: string;
+  fileType: string;
+  previewImageUrl: string;
+  walrusBlobId: string;
+  fileHashBytes: number[];
+  storageEpochs: number;
+  priceMist: string;
+}) {
+  const { packageId, ecosystemId, registryId } = assertRegistryConfig();
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${packageId}::access_pass::create_registered_listing`,
+    arguments: [
+      tx.object(registryId),
+      tx.object(ecosystemId),
+      tx.pure.string(input.title),
+      tx.pure.string(input.description),
+      tx.pure.string(input.fileSize),
+      tx.pure.string(input.fileType),
+      tx.pure.string(input.previewImageUrl),
+      tx.pure.string(input.walrusBlobId),
+      tx.pure.vector("u8", input.fileHashBytes),
+      tx.pure.u64(input.storageEpochs),
+      tx.pure.u64(input.priceMist),
+    ],
+  });
+
+  return tx;
+}
+
 export function buildBuyListingTransaction(input: {
   listingId: string;
   priceMist: string;
@@ -113,12 +188,73 @@ export function buildBuyListingTransaction(input: {
   return tx;
 }
 
+export function buildMintAccessPointerTransaction(input: {
+  fileHashBytes: number[];
+  royaltyMist: string;
+}) {
+  const { packageId, registryId } = assertRegistryConfig();
+  const tx = new Transaction();
+  const [royaltyCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(input.royaltyMist)]);
+
+  tx.moveCall({
+    target: `${packageId}::access_pass::mint_access_pointer`,
+    arguments: [tx.object(registryId), tx.pure.vector("u8", input.fileHashBytes), royaltyCoin],
+  });
+
+  return tx;
+}
+
+export function buildStorageTopUpTransaction(input: {
+  fileHashBytes: number[];
+  additionalEpochs: number;
+  topUpMist: string;
+  blobObjectId?: string;
+}) {
+  const { packageId, registryId } = assertRegistryConfig();
+  const tx = new Transaction();
+  const topUpTarget = getWalrusTopUpTarget();
+  const walrusSystemObjectId = getWalrusSystemObjectId();
+
+  tx.moveCall({
+    target: `${packageId}::access_pass::extend_registered_storage`,
+    arguments: [
+      tx.object(registryId),
+      tx.pure.vector("u8", input.fileHashBytes),
+      tx.pure.u64(input.additionalEpochs),
+    ],
+  });
+
+  if (topUpTarget && walrusSystemObjectId && input.blobObjectId) {
+    const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(input.topUpMist)]);
+
+    tx.moveCall({
+      target: topUpTarget,
+      arguments: [
+        tx.object(walrusSystemObjectId),
+        tx.object(input.blobObjectId),
+        tx.pure.u64(input.additionalEpochs),
+        paymentCoin,
+      ],
+    });
+  }
+
+  return tx;
+}
+
 export function getListingCreatedEvent(transaction: TransactionLike) {
   return findEvent<ListingCreatedEvent>(transaction, "ListingCreated");
 }
 
 export function getListingPurchasedEvent(transaction: TransactionLike) {
   return findEvent<ListingPurchasedEvent>(transaction, "ListingPurchased");
+}
+
+export function getBlobRegisteredEvent(transaction: TransactionLike) {
+  return findEvent<BlobRegisteredEvent>(transaction, "BlobRegistered");
+}
+
+export function getAccessPointerMintedEvent(transaction: TransactionLike) {
+  return findEvent<AccessPointerMintedEvent>(transaction, "AccessPointerMinted");
 }
 
 export function getCreatedListingChange(transaction: TransactionLike) {

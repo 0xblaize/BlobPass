@@ -7,6 +7,7 @@ type StoreWalrusBlobInput = {
   file: File;
   visibility: BlobVisibility;
   origin?: string;
+  storageEpochs?: number;
 };
 
 function getWalrusPublisherUrl() {
@@ -15,6 +16,11 @@ function getWalrusPublisherUrl() {
 
 function getWalrusAggregatorUrl() {
   return process.env.WALRUS_AGGREGATOR_URL || process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR || "";
+}
+
+function getStorageEpochs() {
+  const configured = Number.parseInt(process.env.WALRUS_STORAGE_EPOCHS ?? "", 10);
+  return Number.isFinite(configured) && configured > 0 ? configured : 5;
 }
 
 function extractWalrusBlobId(payload: unknown) {
@@ -29,6 +35,49 @@ function extractWalrusBlobId(payload: unknown) {
   const blobId = blobObject?.blobId ?? alreadyCertified?.blobId ?? record.blobId;
 
   return typeof blobId === "string" ? blobId : "";
+}
+
+function extractWalrusBlobObjectId(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  const record = payload as Record<string, unknown>;
+  const newlyCreated = record.newlyCreated as Record<string, unknown> | undefined;
+  const alreadyCertified = record.alreadyCertified as Record<string, unknown> | undefined;
+  const blobObject = newlyCreated?.blobObject as Record<string, unknown> | undefined;
+  const id = blobObject?.id ?? blobObject?.objectId ?? alreadyCertified?.blobObjectId ?? record.blobObjectId;
+
+  if (typeof id === "string") {
+    return id;
+  }
+
+  if (id && typeof id === "object" && "id" in id && typeof (id as Record<string, unknown>).id === "string") {
+    return String((id as Record<string, unknown>).id);
+  }
+
+  return "";
+}
+
+function extractWalrusStorageEndEpoch(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const newlyCreated = record.newlyCreated as Record<string, unknown> | undefined;
+  const alreadyCertified = record.alreadyCertified as Record<string, unknown> | undefined;
+  const blobObject = newlyCreated?.blobObject as Record<string, unknown> | undefined;
+  const candidate =
+    blobObject?.storageEndEpoch ??
+    blobObject?.endEpoch ??
+    alreadyCertified?.storageEndEpoch ??
+    alreadyCertified?.endEpoch ??
+    record.storageEndEpoch ??
+    record.endEpoch;
+  const parsed = typeof candidate === "string" ? Number.parseInt(candidate, 10) : candidate;
+
+  return Number.isFinite(parsed) ? Number(parsed) : undefined;
 }
 
 function bytesToArrayBuffer(bytes: Uint8Array) {
@@ -117,15 +166,20 @@ export async function storeWalrusBlob({
   file,
   visibility,
   origin,
+  storageEpochs: requestedStorageEpochs,
 }: StoreWalrusBlobInput): Promise<UploadReceipt> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const contentType = contentTypeFor(file);
   const publisher = getWalrusPublisherUrl();
+  const storageEpochs =
+    Number.isFinite(requestedStorageEpochs) && requestedStorageEpochs && requestedStorageEpochs > 0
+      ? requestedStorageEpochs
+      : getStorageEpochs();
 
   if (publisher) {
     try {
       const url = new URL("/v1/blobs", publisher);
-      url.searchParams.set("epochs", process.env.WALRUS_STORAGE_EPOCHS ?? "5");
+      url.searchParams.set("epochs", String(storageEpochs));
 
       const response = await fetch(url, {
         method: "PUT",
@@ -141,6 +195,7 @@ export async function storeWalrusBlob({
 
       const payload: unknown = await response.json();
       const blobId = extractWalrusBlobId(payload);
+      const blobObjectId = extractWalrusBlobObjectId(payload);
 
       if (!blobId) {
         throw new Error("Walrus upload succeeded without a blob id");
@@ -148,12 +203,15 @@ export async function storeWalrusBlob({
 
       return {
         blobId,
+        blobObjectId,
         url: walrusBlobUrl(blobId),
         filename: file.name,
         contentType,
         size: file.size,
         visibility,
         source: "walrus",
+        storageEpochs,
+        storageEndEpoch: extractWalrusStorageEndEpoch(payload),
       };
     } catch {
       // Fall through to local persistence so the app remains usable offline.
@@ -176,6 +234,7 @@ export async function storeWalrusBlob({
     size: file.size,
     visibility,
     source: "local",
+    storageEpochs,
   };
 }
 

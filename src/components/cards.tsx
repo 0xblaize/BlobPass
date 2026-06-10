@@ -8,19 +8,35 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  Clock,
   Download,
   ExternalLink,
   Image as ImageIcon,
+  RefreshCw,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import {
   buildBuyListingTransaction,
+  buildStorageTopUpTransaction,
   getListingPurchasedEvent,
   getTransferredPassChange,
 } from "@/lib/blobpass/sui";
 import type { LibraryAssetView, MarketplaceListing } from "@/lib/blobpass/types";
+
+const STORAGE_TOP_UP_MIST_PER_EPOCH = BigInt("100000000");
+
+function hexToBytes(value: string) {
+  const normalized = value.trim().replace(/^0x/i, "");
+  const bytes: number[] = [];
+
+  for (let index = 0; index < normalized.length; index += 2) {
+    bytes.push(Number.parseInt(normalized.slice(index, index + 2), 16));
+  }
+
+  return bytes;
+}
 
 function PreviewImage({
   item,
@@ -119,6 +135,73 @@ function usePurchase(item: MarketplaceListing) {
   return { buy, state, account, errorMessage };
 }
 
+function useStorageTopUp(asset: LibraryAssetView) {
+  const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const queryClient = useQueryClient();
+  const signAndExecute = useSignAndExecuteTransaction();
+  const [state, setState] = useState<"idle" | "signing" | "confirming" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function topUp(additionalEpochs = 1) {
+    if (!account?.address) {
+      setState("error");
+      setErrorMessage("Connect a Sui wallet before extending storage.");
+      return;
+    }
+
+    setState("signing");
+    setErrorMessage("");
+
+    try {
+      const transaction = buildStorageTopUpTransaction({
+        fileHashBytes: hexToBytes(asset.fileHash),
+        additionalEpochs,
+        topUpMist: (STORAGE_TOP_UP_MIST_PER_EPOCH * BigInt(additionalEpochs)).toString(),
+        blobObjectId: asset.blobObjectId,
+      });
+
+      const txResult = await signAndExecute.mutateAsync({
+        transaction,
+      });
+
+      setState("confirming");
+
+      await suiClient.waitForTransaction({
+        digest: txResult.digest,
+        options: {
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      const response = await fetch("/api/storage-top-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileHash: asset.fileHash,
+          additionalEpochs,
+          walletAddress: account.address,
+          transactionDigest: txResult.digest,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Storage top-up sync failed");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["library"] });
+      setState("idle");
+    } catch (error) {
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Storage top-up failed.");
+    }
+  }
+
+  return { topUp, state, errorMessage };
+}
+
 export function ListingCard({ item }: { item: MarketplaceListing }) {
   const { buy, state, account, errorMessage } = usePurchase(item);
 
@@ -205,8 +288,15 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
 export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const owned = asset.status === "Owned";
+  const topUp = useStorageTopUp(asset);
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "error">("idle");
   const [downloadError, setDownloadError] = useState("");
+  const storageTone =
+    asset.storageHealth === "expired"
+      ? "border-red-400/30 bg-red-400/10 text-red-200"
+      : asset.storageHealth === "expiring"
+        ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
+        : "border-cyan-300/25 bg-cyan-300/8 text-cyan-100";
 
   return (
     <article className="panel overflow-hidden rounded-lg">
@@ -240,6 +330,31 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
             <strong className="text-cyan-300">{asset.price}</strong>
           </div>
         ) : null}
+        <div className={`rounded-lg border p-4 text-sm ${storageTone}`}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 font-black">
+              <Clock size={16} /> Keep-Alive
+            </span>
+            <span className="mono text-xs">Epoch {asset.storageEndEpoch}</span>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{asset.storageRenewalLabel}</span>
+            <button
+              className="button-secondary min-h-9 px-3 text-xs"
+              disabled={topUp.state === "signing" || topUp.state === "confirming" || !asset.fileHash}
+              onClick={() => void topUp.topUp(1)}
+              type="button"
+            >
+              <RefreshCw size={14} />
+              {topUp.state === "signing"
+                ? "Sign"
+                : topUp.state === "confirming"
+                  ? "Syncing"
+                  : "Top Up"}
+            </button>
+          </div>
+          {topUp.errorMessage ? <p className="mt-3 text-xs font-bold text-red-200">{topUp.errorMessage}</p> : null}
+        </div>
         {owned && asset.rawFileBlobId ? (
           <button
             className="button-primary w-full"

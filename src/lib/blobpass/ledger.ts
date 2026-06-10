@@ -1,12 +1,15 @@
 import { dateLabel, formatBytes, mistToSui, shortAddress, shortBlob } from "./format";
 import {
   findRegistryPassByBlobId,
+  findRegistryPassByFileHash,
   getRegistryPass,
   getRegistryPassByListingId,
   getRegistrySellerEarnings,
+  extendRegistryStorage,
   indexRegistryListing,
   listRegistryInventory,
   listRegistryMarketplacePasses,
+  mintRegistryAccessPointer,
   syncRegistryPurchase,
   verifyRegistryOwnership,
 } from "./registry";
@@ -26,8 +29,46 @@ type CreatePassInput = {
   priceMist: string;
   assetFilename: string;
   storageSource: "local" | "walrus";
+  blobObjectId?: string;
+  fileHash?: string;
+  storageStartEpoch?: number;
+  storageEndEpoch?: number;
+  storageEpochDurationDays?: number;
+  originalUploader?: string;
+  royaltyBps?: number;
   fields: DataAccessPassFields;
 };
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getStorageDaysRemaining(pass: DataAccessPassObject) {
+  if (!pass.storageEndEpoch || !pass.storageEpochDurationDays) {
+    return 0;
+  }
+
+  const startEpoch = pass.storageStartEpoch || 0;
+  const totalEpochs = Math.max(0, pass.storageEndEpoch - startEpoch);
+  const registeredAt = new Date(pass.storageRegisteredAt || pass.createdAt).getTime();
+  const expiresAt = registeredAt + totalEpochs * pass.storageEpochDurationDays * MS_PER_DAY;
+
+  if (!Number.isFinite(expiresAt)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((expiresAt - Date.now()) / MS_PER_DAY));
+}
+
+function getStorageHealth(daysRemaining: number) {
+  if (daysRemaining <= 0) {
+    return "expired" as const;
+  }
+
+  if (daysRemaining <= 3) {
+    return "expiring" as const;
+  }
+
+  return "healthy" as const;
+}
 
 function getBlobPassPackageId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
@@ -35,6 +76,10 @@ function getBlobPassPackageId() {
 
 function getPlatformKioskId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
+}
+
+function getBlobRegistryId() {
+  return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_ID || "";
 }
 
 function getTatumRpcUrl() {
@@ -48,12 +93,14 @@ function getTatumRpcUrl() {
 
 function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceListing {
   const fields = pass.content.fields;
+  const storageDaysRemaining = getStorageDaysRemaining(pass);
 
   return {
     id: pass.listingId,
     passId: pass.id,
     listingId: pass.listingId,
     listingInitialSharedVersion: pass.listingInitialSharedVersion,
+    blobObjectId: pass.blobObjectId,
     title: fields.title,
     category: pass.category,
     description: fields.description,
@@ -68,6 +115,12 @@ function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceLis
     date: dateLabel(pass.createdAt),
     gradient: pass.gradient,
     source: pass.source,
+    fileHash: pass.fileHash,
+    storageEndEpoch: pass.storageEndEpoch,
+    storageEpochDurationDays: pass.storageEpochDurationDays,
+    storageDaysRemaining,
+    storageHealth: getStorageHealth(storageDaysRemaining),
+    royaltyBps: pass.royaltyBps,
   };
 }
 
@@ -76,10 +129,12 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
   const normalizedAddress = address.toLowerCase();
   const listedByUser = Boolean(address) && pass.listed && pass.seller.toLowerCase() === normalizedAddress;
   const owned = Boolean(address) && !listedByUser && pass.owner.toLowerCase() === normalizedAddress;
+  const storageDaysRemaining = getStorageDaysRemaining(pass);
 
   return {
     passId: pass.id,
     listingId: pass.listingId,
+    blobObjectId: pass.blobObjectId,
     title: fields.title,
     category: pass.category,
     status: owned ? "Owned" : listedByUser ? "Your Listing" : "Locked",
@@ -94,6 +149,17 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
     rawFileBlobId: owned ? fields.walrus_blob_id : undefined,
     previewImageUrl: fields.preview_image_url,
     source: pass.source,
+    fileHash: pass.fileHash,
+    storageStartEpoch: pass.storageStartEpoch,
+    storageEndEpoch: pass.storageEndEpoch,
+    storageEpochDurationDays: pass.storageEpochDurationDays,
+    storageDaysRemaining,
+    storageHealth: getStorageHealth(storageDaysRemaining),
+    storageRenewalLabel:
+      storageDaysRemaining > 0
+        ? `${storageDaysRemaining} day${storageDaysRemaining === 1 ? "" : "s"} remaining`
+        : "Storage window expired",
+    royaltyBps: pass.royaltyBps,
   };
 }
 
@@ -189,6 +255,10 @@ export async function getDataAccessPassByBlobId(blobId: string) {
   return findRegistryPassByBlobId(blobId);
 }
 
+export async function getDataAccessPassByFileHash(fileHash: string) {
+  return findRegistryPassByFileHash(fileHash);
+}
+
 export async function getDataAccessPassByListingId(listingId: string) {
   return getRegistryPassByListingId(listingId);
 }
@@ -204,9 +274,67 @@ export function getNativeSuiConfig() {
     missing.push("NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID");
   }
 
+  if (!getBlobRegistryId()) {
+    missing.push("NEXT_PUBLIC_BLOBPASS_REGISTRY_ID");
+  }
+
   return {
     configured: missing.length === 0,
     missing,
+  };
+}
+
+export async function mintAccessPointer({
+  fileHash,
+  buyerAddress,
+  royaltyMist,
+  transactionDigest,
+  passId,
+}: {
+  fileHash: string;
+  buyerAddress: string;
+  royaltyMist: string;
+  transactionDigest?: string;
+  passId?: string;
+}) {
+  const pass = await mintRegistryAccessPointer({
+    fileHash,
+    buyerAddress,
+    royaltyMist,
+    transactionDigest,
+    passId,
+  });
+
+  if (!pass) {
+    return null;
+  }
+
+  return {
+    pass,
+    asset: mapPassToLibraryAsset(pass, buyerAddress),
+  };
+}
+
+export async function topUpStorage({
+  fileHash,
+  additionalEpochs,
+  walletAddress,
+  transactionDigest,
+}: {
+  fileHash: string;
+  additionalEpochs: number;
+  walletAddress: string;
+  transactionDigest?: string;
+}) {
+  const passes = await extendRegistryStorage({
+    fileHash,
+    additionalEpochs,
+    transactionDigest,
+  });
+
+  return {
+    passes,
+    assets: passes.map((pass) => mapPassToLibraryAsset(pass, walletAddress)),
   };
 }
 

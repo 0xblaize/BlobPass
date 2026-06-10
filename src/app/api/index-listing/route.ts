@@ -15,6 +15,13 @@ type IndexListingBody = {
   passId?: string;
   listingId?: string;
   listingInitialSharedVersion?: string;
+  blobObjectId?: string;
+  fileHash?: string;
+  storageStartEpoch?: number;
+  storageEndEpoch?: number;
+  storageEpochDurationDays?: number;
+  originalUploader?: string;
+  royaltyBps?: number;
   transactionDigest?: string;
   fields?: {
     title?: string;
@@ -58,6 +65,13 @@ export async function POST(request: NextRequest) {
       passId: body.passId,
       listingId: body.listingId,
       listingInitialSharedVersion: body.listingInitialSharedVersion,
+      blobObjectId: body.blobObjectId,
+      fileHash: body.fileHash,
+      storageStartEpoch: body.storageStartEpoch,
+      storageEndEpoch: body.storageEndEpoch,
+      storageEpochDurationDays: body.storageEpochDurationDays,
+      originalUploader: body.originalUploader,
+      royaltyBps: body.royaltyBps,
       transactionDigest: body.transactionDigest,
       fields: {
         title: body.fields.title,

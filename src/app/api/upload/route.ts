@@ -32,10 +32,12 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = request.nextUrl.origin;
+    const requestedStorageEpochs = Number.parseInt(formString(formData, "storageEpochs", "5"), 10);
     const rawUpload = await storeWalrusBlob({
       file: assetFile,
       visibility: "hidden",
       origin,
+      storageEpochs: requestedStorageEpochs,
     });
 
     const previewUpload = isFile(previewFile)
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
           file: previewFile,
           visibility: "public",
           origin,
+          storageEpochs: requestedStorageEpochs,
         })
       : null;
 
@@ -55,6 +58,8 @@ export async function POST(request: NextRequest) {
     const category = formString(formData, "category", "Digital Asset");
     const priceMist = suiToMist(formString(formData, "priceSui", "1"));
     const sellerAddress = formString(formData, "sellerAddress", DEMO_SELLER_ADDRESS);
+    const fileHash = formString(formData, "fileHash");
+    const storageEndEpoch = rawUpload.storageEndEpoch;
 
     return NextResponse.json({
       ok: true,
@@ -62,6 +67,7 @@ export async function POST(request: NextRequest) {
       source: rawUpload.source,
       previewBlobId: previewUpload?.blobId ?? null,
       rawFileBlobId: rawUpload.blobId,
+      rawFileBlobObjectId: rawUpload.blobObjectId ?? null,
       previewUrl: previewUpload?.url ?? null,
       upload: {
         rawFile: rawUpload,
@@ -76,6 +82,15 @@ export async function POST(request: NextRequest) {
         sellerAddress,
         file_size: String(assetFile.size),
         file_type: assetFile.type || "application/octet-stream",
+        fileHash,
+        storageEpochs: rawUpload.storageEpochs,
+        storageEndEpoch,
+        storageEpochDurationDays: Number.parseInt(
+          process.env.WALRUS_EPOCH_DURATION_DAYS ??
+            process.env.NEXT_PUBLIC_WALRUS_EPOCH_DURATION_DAYS ??
+            "14",
+          10,
+        ),
       },
       nativeSui: getNativeSuiConfig(),
     });

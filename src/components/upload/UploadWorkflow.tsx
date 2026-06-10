@@ -18,11 +18,16 @@ import { FormEvent, useMemo, useState } from "react";
 import { suiToMist } from "@/lib/blobpass/format";
 import {
   buildCreateListingTransaction,
+  buildCreateRegisteredListingTransaction,
+  buildMintAccessPointerTransaction,
   extractPassIdFromListingObject,
+  getAccessPointerMintedEvent,
+  getBlobRegisteredEvent,
   getCreatedListingChange,
   getCreatedPassChange,
   getInitialSharedVersionFromChange,
   getListingCreatedEvent,
+  getTransferredPassChange,
 } from "@/lib/blobpass/sui";
 import type { UploadReceipt } from "@/lib/blobpass/types";
 
@@ -32,6 +37,7 @@ type UploadResponse = {
   source: UploadReceipt["source"];
   previewBlobId: string | null;
   rawFileBlobId: string;
+  rawFileBlobObjectId: string | null;
   previewUrl: string | null;
   upload: {
     rawFile: UploadReceipt;
@@ -46,10 +52,33 @@ type UploadResponse = {
     sellerAddress: string;
     file_size: string;
     file_type: string;
+    fileHash: string;
+    storageEpochs: number;
+    storageEndEpoch?: number;
+    storageEpochDurationDays: number;
   };
   nativeSui: {
     configured: boolean;
     missing: string[];
+  };
+};
+
+type HashCheckResponse = {
+  ok: true;
+  exists: boolean;
+  match?: {
+    passId: string;
+    listingId: string;
+    title: string;
+    blobId: string;
+    blobLabel: string;
+    originalUploader: string;
+    originalUploaderLabel: string;
+    royaltyBps: number;
+    royaltyMist: string;
+    royaltySui: string;
+    storageEndEpoch: number;
+    storageEpochDurationDays: number;
   };
 };
 
@@ -68,11 +97,36 @@ type IndexedListingResponse = {
 };
 
 const flow = [
-  { label: "Upload", icon: Upload },
+  { label: "Hash", icon: ShieldCheck },
   { label: "Metadata", icon: FileText },
   { label: "Walrus Store", icon: Database },
   { label: "Mint & List", icon: CheckCircle },
 ];
+
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(value: string) {
+  const normalized = value.trim().replace(/^0x/i, "");
+  const bytes: number[] = [];
+
+  for (let index = 0; index < normalized.length; index += 2) {
+    bytes.push(Number.parseInt(normalized.slice(index, index + 2), 16));
+  }
+
+  return bytes;
+}
+
+async function hashFile(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function toNumber(value: string | number | undefined, fallback = 0) {
+  const parsed = typeof value === "string" ? Number.parseInt(value, 10) : value;
+  return Number.isFinite(parsed) ? Number(parsed) : fallback;
+}
 
 export function UploadWorkflow() {
   const account = useCurrentAccount();
@@ -84,8 +138,12 @@ export function UploadWorkflow() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Digital Asset");
   const [priceSui, setPriceSui] = useState("1");
+  const [storageEpochs, setStorageEpochs] = useState("5");
+  const [fileHash, setFileHash] = useState("");
+  const [hashStatus, setHashStatus] = useState<"idle" | "hashing" | "checked" | "error">("idle");
+  const [duplicateMatch, setDuplicateMatch] = useState<HashCheckResponse["match"] | null>(null);
   const [status, setStatus] = useState<
-    "idle" | "uploading" | "signing" | "confirming" | "stored" | "error"
+    "idle" | "hashing" | "uploading" | "signing" | "confirming" | "stored" | "error"
   >("idle");
   const [response, setResponse] = useState<IndexedListingResponse | null>(null);
   const [txDigest, setTxDigest] = useState("");
@@ -94,6 +152,10 @@ export function UploadWorkflow() {
   const activeStep = useMemo(() => {
     if (status === "stored") {
       return 3;
+    }
+
+    if (status === "hashing" || hashStatus === "hashing") {
+      return 0;
     }
 
     if (status === "uploading" || status === "signing" || status === "confirming") {
@@ -105,13 +167,48 @@ export function UploadWorkflow() {
     }
 
     return 0;
-  }, [assetFile, status]);
+  }, [assetFile, hashStatus, status]);
+
+  async function inspectFile(nextFile: File | null) {
+    setAssetFile(nextFile);
+    setFileHash("");
+    setDuplicateMatch(null);
+    setHashStatus("idle");
+
+    if (!nextFile) {
+      return;
+    }
+
+    setHashStatus("hashing");
+    setError("");
+
+    try {
+      const digest = await hashFile(nextFile);
+      setFileHash(digest);
+
+      const response = await fetch(`/api/hash-check?fileHash=${encodeURIComponent(digest)}`);
+      const payload = (await response.json()) as HashCheckResponse | { error?: string };
+
+      if (!response.ok) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Hash registry check failed");
+      }
+
+      if ("exists" in payload && payload.exists) {
+        setDuplicateMatch(payload.match ?? null);
+      }
+
+      setHashStatus("checked");
+    } catch (hashError) {
+      setHashStatus("error");
+      setError(hashError instanceof Error ? hashError.message : "Could not hash file");
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!account?.address) {
-      setError("Connect a Sui wallet before uploading a protected asset.");
+      setError("Connect a Sui wallet before storing or minting access.");
       return;
     }
 
@@ -120,25 +217,114 @@ export function UploadWorkflow() {
       return;
     }
 
-    setStatus("uploading");
     setError("");
     setResponse(null);
     setTxDigest("");
 
-    const formData = new FormData();
-    formData.append("asset", assetFile);
-
-    if (previewFile) {
-      formData.append("preview", previewFile);
-    }
-
-    formData.append("title", title || assetFile.name);
-    formData.append("description", description);
-    formData.append("category", category);
-    formData.append("priceSui", priceSui);
-    formData.append("sellerAddress", account?.address ?? "");
-
     try {
+      if (!fileHash) {
+        setStatus("hashing");
+      }
+
+      const digest = fileHash || (await hashFile(assetFile));
+      const hashBytes = hexToBytes(digest);
+      setFileHash(digest);
+      let existingMatch = duplicateMatch;
+
+      if (!existingMatch) {
+        const hashResponse = await fetch(`/api/hash-check?fileHash=${encodeURIComponent(digest)}`);
+        const hashPayload = (await hashResponse.json()) as HashCheckResponse | { error?: string };
+
+        if (!hashResponse.ok) {
+          throw new Error(
+            "error" in hashPayload && hashPayload.error ? hashPayload.error : "Hash registry check failed",
+          );
+        }
+
+        if ("exists" in hashPayload && hashPayload.exists && hashPayload.match) {
+          existingMatch = hashPayload.match;
+          setDuplicateMatch(hashPayload.match);
+        }
+      }
+
+      if (existingMatch) {
+        setStatus("signing");
+
+        const pointerTx = buildMintAccessPointerTransaction({
+          fileHashBytes: hashBytes,
+          royaltyMist: existingMatch.royaltyMist,
+        });
+
+        const pointerTxResult = await signAndExecute.mutateAsync({
+          transaction: pointerTx,
+        });
+
+        setTxDigest(pointerTxResult.digest);
+        setStatus("confirming");
+
+        const pointerFinalized = await suiClient.waitForTransaction({
+          digest: pointerTxResult.digest,
+          options: {
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+
+        const pointerEvent = getAccessPointerMintedEvent(pointerFinalized);
+        const pointerPassChange = getCreatedPassChange(pointerFinalized) || getTransferredPassChange(pointerFinalized);
+        const pointerPassId =
+          pointerEvent?.pass_id || (typeof pointerPassChange?.objectId === "string" ? pointerPassChange.objectId : "");
+
+        const pointerResponse = await fetch("/api/access-pointer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileHash: digest,
+            buyerAddress: account.address,
+            royaltyMist: existingMatch.royaltyMist,
+            transactionDigest: pointerTxResult.digest,
+            passId: pointerPassId,
+          }),
+        });
+
+        const pointerPayload = (await pointerResponse.json()) as
+          | {
+              pass: IndexedListingResponse["pass"];
+              error?: string;
+            }
+          | { error?: string };
+
+        if (!pointerResponse.ok || !("pass" in pointerPayload)) {
+          throw new Error(pointerPayload.error || "BlobPass could not index the duplicate access pointer.");
+        }
+
+        setResponse({
+          ok: true,
+          pass: pointerPayload.pass,
+        });
+        setStatus("stored");
+        return;
+      }
+
+      setStatus("uploading");
+
+      const formData = new FormData();
+      formData.append("asset", assetFile);
+
+      if (previewFile) {
+        formData.append("preview", previewFile);
+      }
+
+      formData.append("title", title || assetFile.name);
+      formData.append("description", description);
+      formData.append("category", category);
+      formData.append("priceSui", priceSui);
+      formData.append("sellerAddress", account.address);
+      formData.append("fileHash", digest);
+      formData.append("storageEpochs", storageEpochs);
+
       const result = await fetch("/api/upload", {
         method: "POST",
         body: formData,
@@ -156,18 +342,32 @@ export function UploadWorkflow() {
 
       const uploadPayload = payload as UploadResponse;
       const priceMist = uploadPayload.asset.priceMist || suiToMist(priceSui);
+      const storageEpochCount = Math.max(1, Number.parseInt(storageEpochs, 10) || uploadPayload.asset.storageEpochs || 5);
+      const useRegisteredRegistry = uploadPayload.nativeSui.configured;
 
       setStatus("signing");
 
-      const transaction = buildCreateListingTransaction({
-        title: uploadPayload.asset.title,
-        description: uploadPayload.asset.description,
-        fileSize: uploadPayload.asset.file_size,
-        fileType: uploadPayload.asset.file_type,
-        previewImageUrl: uploadPayload.previewUrl ?? "",
-        walrusBlobId: uploadPayload.rawFileBlobId,
-        priceMist,
-      });
+      const transaction = useRegisteredRegistry
+        ? buildCreateRegisteredListingTransaction({
+            title: uploadPayload.asset.title,
+            description: uploadPayload.asset.description,
+            fileSize: uploadPayload.asset.file_size,
+            fileType: uploadPayload.asset.file_type,
+            previewImageUrl: uploadPayload.previewUrl ?? "",
+            walrusBlobId: uploadPayload.rawFileBlobId,
+            fileHashBytes: hashBytes,
+            storageEpochs: storageEpochCount,
+            priceMist,
+          })
+        : buildCreateListingTransaction({
+            title: uploadPayload.asset.title,
+            description: uploadPayload.asset.description,
+            fileSize: uploadPayload.asset.file_size,
+            fileType: uploadPayload.asset.file_type,
+            previewImageUrl: uploadPayload.previewUrl ?? "",
+            walrusBlobId: uploadPayload.rawFileBlobId,
+            priceMist,
+          });
 
       const txResult = await signAndExecute.mutateAsync({
         transaction,
@@ -185,6 +385,7 @@ export function UploadWorkflow() {
       });
 
       const createdEvent = getListingCreatedEvent(finalized);
+      const blobRegisteredEvent = getBlobRegisteredEvent(finalized);
       const listingChange = getCreatedListingChange(finalized);
       const passChange = getCreatedPassChange(finalized);
       const listingId =
@@ -227,6 +428,16 @@ export function UploadWorkflow() {
           listingId,
           listingInitialSharedVersion,
           transactionDigest: txResult.digest,
+          blobObjectId: blobRegisteredEvent?.blob_object_id || uploadPayload.rawFileBlobObjectId || "",
+          fileHash: digest,
+          storageStartEpoch: toNumber(blobRegisteredEvent?.storage_start_epoch, 0),
+          storageEndEpoch: toNumber(
+            blobRegisteredEvent?.storage_end_epoch,
+            uploadPayload.asset.storageEndEpoch || storageEpochCount,
+          ),
+          storageEpochDurationDays: uploadPayload.asset.storageEpochDurationDays,
+          originalUploader: account.address,
+          royaltyBps: toNumber(blobRegisteredEvent?.royalty_bps, 500),
           fields: {
             title: uploadPayload.asset.title,
             description: uploadPayload.asset.description,
@@ -305,7 +516,7 @@ export function UploadWorkflow() {
             <label className="grid min-h-[240px] cursor-pointer place-items-center rounded-xl border border-dashed border-white/18 bg-white/[0.02] p-8 text-center hover:border-cyan-300/60">
               <input
                 className="sr-only"
-                onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
               <div>
@@ -318,6 +529,34 @@ export function UploadWorkflow() {
                 </p>
               </div>
             </label>
+
+            {assetFile ? (
+              <div className="rounded-lg border border-white/10 bg-zinc-950 p-5 text-sm text-zinc-300">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="font-black text-cyan-300">
+                    {hashStatus === "hashing"
+                      ? "Hashing File..."
+                      : duplicateMatch
+                        ? "Duplicate Blob Found"
+                        : hashStatus === "checked"
+                          ? "Unique Blob Candidate"
+                          : "Hash Pending"}
+                  </span>
+                  {fileHash ? <span className="mono text-xs text-zinc-500">{fileHash.slice(0, 18)}...</span> : null}
+                </div>
+                {duplicateMatch ? (
+                  <p className="mt-3 leading-6 text-zinc-400">
+                    Existing Walrus blob {duplicateMatch.blobLabel} was uploaded by{" "}
+                    {duplicateMatch.originalUploaderLabel}. This upload will mint an access pointer and route{" "}
+                    {duplicateMatch.royaltySui} SUI as a storage royalty.
+                  </p>
+                ) : (
+                  <p className="mt-3 leading-6 text-zinc-400">
+                    BlobPass checks SHA-256 locally before uploading, so duplicate assets can reuse existing storage.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             <label className="grid gap-3 text-sm font-bold text-zinc-300">
               Public Preview Image
@@ -358,7 +597,7 @@ export function UploadWorkflow() {
               />
             </label>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               <label className="grid gap-3 text-sm font-bold text-zinc-300">
                 Category
                 <select
@@ -383,20 +622,42 @@ export function UploadWorkflow() {
                   value={priceSui}
                 />
               </label>
+
+              <label className="grid gap-3 text-sm font-bold text-zinc-300">
+                Epochs
+                <input
+                  className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
+                  min="1"
+                  onChange={(event) => setStorageEpochs(event.target.value)}
+                  step="1"
+                  type="number"
+                  value={storageEpochs}
+                />
+              </label>
             </div>
 
             <button
               className="button-primary min-h-14 w-full text-base"
-              disabled={status === "uploading" || status === "signing" || status === "confirming"}
+              disabled={
+                status === "hashing" ||
+                hashStatus === "hashing" ||
+                status === "uploading" ||
+                status === "signing" ||
+                status === "confirming"
+              }
               type="submit"
             >
-              {status === "uploading"
+              {status === "hashing" || hashStatus === "hashing"
+                ? "Checking Registry..."
+                : status === "uploading"
                 ? "Uploading..."
                 : status === "signing"
                   ? "Awaiting Wallet Signature..."
                   : status === "confirming"
                     ? "Confirming On-Chain..."
-                    : "Store & List Asset"}
+                    : duplicateMatch
+                      ? "Mint Access Pointer"
+                      : "Store & List Asset"}
               <ArrowRight size={20} />
             </button>
 
@@ -410,7 +671,7 @@ export function UploadWorkflow() {
 
             {response ? (
               <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/8 p-5 text-sm text-zinc-300">
-                <div className="mb-3 font-black text-cyan-300">Listing Live</div>
+                <div className="mb-3 font-black text-cyan-300">Access Live</div>
                 <div className="grid gap-2">
                   <span>Pass: {response.pass.id}</span>
                   <span>Listing: {response.pass.listingId}</span>
@@ -418,7 +679,7 @@ export function UploadWorkflow() {
                   <span>Transaction: {txDigest || "pending"}</span>
                 </div>
                 <p className="mt-4 leading-6 text-zinc-300">
-                  The file is stored, the access pass is minted on Sui, and the marketplace cache has been updated with the real on-chain IDs.
+                  The asset lifecycle is recorded, the access object is minted on Sui, and the local mirror has been updated with the on-chain IDs.
                 </p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                   <Link className="button-primary min-h-11 flex-1 justify-center" href="/marketplace">

@@ -4,6 +4,8 @@ export type BlobVisibility = "public" | "hidden";
 
 export type AccessPassVerificationMode = "registry" | "tatum-object-owner";
 
+export type StorageHealth = "healthy" | "expiring" | "expired" | "unknown";
+
 export type DataAccessPassFields = {
   title: string;
   description: string;
@@ -17,6 +19,7 @@ export type DataAccessPassObject = {
   id: string;
   listingId: string;
   listingInitialSharedVersion?: string;
+  blobObjectId?: string;
   owner: string;
   seller: string;
   category: string;
@@ -29,7 +32,19 @@ export type DataAccessPassObject = {
   storageSource: Extract<BlobPassRuntimeSource, "local" | "walrus">;
   verificationMode: AccessPassVerificationMode;
   assetFilename: string;
+  fileHash: string;
+  originalUploader: string;
+  royaltyBps: number;
+  storageStartEpoch: number;
+  storageEndEpoch: number;
+  storageEpochDurationDays: number;
+  storageRegisteredAt: string;
+  storageTopUps: number;
+  storageRoyaltyMist: string;
+  pointer: boolean;
+  duplicateOfPassId?: string;
   lastTransactionDigest?: string;
+  lastStorageTopUpDigest?: string;
   content: {
     fields: DataAccessPassFields;
   };
@@ -37,12 +52,15 @@ export type DataAccessPassObject = {
 
 export type UploadReceipt = {
   blobId: string;
+  blobObjectId?: string;
   url: string;
   filename: string;
   contentType: string;
   size: number;
   visibility: BlobVisibility;
   source: BlobPassRuntimeSource;
+  storageEpochs: number;
+  storageEndEpoch?: number;
 };
 
 export type TransactionCallSpec = {
@@ -66,6 +84,7 @@ export type MarketplaceListing = {
   passId: string;
   listingId: string;
   listingInitialSharedVersion?: string;
+  blobObjectId?: string;
   title: string;
   category: string;
   description: string;
@@ -80,11 +99,18 @@ export type MarketplaceListing = {
   date: string;
   gradient: string;
   source: BlobPassRuntimeSource;
+  fileHash: string;
+  storageEndEpoch: number;
+  storageEpochDurationDays: number;
+  storageDaysRemaining: number;
+  storageHealth: StorageHealth;
+  royaltyBps: number;
 };
 
 export type LibraryAssetView = {
   passId: string;
   listingId: string;
+  blobObjectId?: string;
   title: string;
   category: string;
   status: "Owned" | "Your Listing" | "Locked";
@@ -97,6 +123,14 @@ export type LibraryAssetView = {
   rawFileBlobId?: string;
   previewImageUrl: string;
   source: BlobPassRuntimeSource;
+  fileHash: string;
+  storageStartEpoch: number;
+  storageEndEpoch: number;
+  storageEpochDurationDays: number;
+  storageDaysRemaining: number;
+  storageHealth: StorageHealth;
+  storageRenewalLabel: string;
+  royaltyBps: number;
 };
 
 export type LibraryStats = {
