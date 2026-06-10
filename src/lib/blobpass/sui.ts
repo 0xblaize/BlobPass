@@ -40,6 +40,11 @@ export type AccessPointerMintedEvent = {
   storage_end_epoch?: string | number;
 };
 
+export type ListingDelistedEvent = {
+  listing_id?: string;
+  pass_id?: string;
+};
+
 function getPackageId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
 }
@@ -48,8 +53,16 @@ function getEcosystemId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
 }
 
+function getEcosystemInitialSharedVersion() {
+  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_INITIAL_SHARED_VERSION || "";
+}
+
 function getRegistryId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_ID || "";
+}
+
+function getRegistryInitialSharedVersion() {
+  return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_INITIAL_SHARED_VERSION || "";
 }
 
 function getWalrusTopUpTarget() {
@@ -58,6 +71,10 @@ function getWalrusTopUpTarget() {
 
 function getWalrusSystemObjectId() {
   return process.env.NEXT_PUBLIC_WALRUS_SYSTEM_OBJECT_ID || "";
+}
+
+function asSuiObjectId(value: string | undefined) {
+  return value && /^0x[0-9a-fA-F]+$/.test(value) ? value : null;
 }
 
 function assertConfig() {
@@ -101,6 +118,16 @@ function findEvent<T>(transaction: TransactionLike, name: string) {
   return (match?.parsedJson ?? null) as T | null;
 }
 
+function sharedOrObject(tx: Transaction, objectId: string, initialSharedVersion: string, mutable: boolean) {
+  return initialSharedVersion
+    ? tx.sharedObjectRef({
+        objectId,
+        initialSharedVersion,
+        mutable,
+      })
+    : tx.object(objectId);
+}
+
 export function buildCreateListingTransaction(input: {
   title: string;
   description: string;
@@ -112,11 +139,17 @@ export function buildCreateListingTransaction(input: {
 }) {
   const { packageId, ecosystemId } = assertConfig();
   const tx = new Transaction();
+  const ecosystemArg = sharedOrObject(
+    tx,
+    ecosystemId,
+    getEcosystemInitialSharedVersion(),
+    true,
+  );
 
   tx.moveCall({
     target: `${packageId}::access_pass::create_listing`,
     arguments: [
-      tx.object(ecosystemId),
+      ecosystemArg,
       tx.pure.string(input.title),
       tx.pure.string(input.description),
       tx.pure.string(input.fileSize),
@@ -143,12 +176,19 @@ export function buildCreateRegisteredListingTransaction(input: {
 }) {
   const { packageId, ecosystemId, registryId } = assertRegistryConfig();
   const tx = new Transaction();
+  const registryArg = sharedOrObject(tx, registryId, getRegistryInitialSharedVersion(), true);
+  const ecosystemArg = sharedOrObject(
+    tx,
+    ecosystemId,
+    getEcosystemInitialSharedVersion(),
+    true,
+  );
 
   tx.moveCall({
     target: `${packageId}::access_pass::create_registered_listing`,
     arguments: [
-      tx.object(registryId),
-      tx.object(ecosystemId),
+      registryArg,
+      ecosystemArg,
       tx.pure.string(input.title),
       tx.pure.string(input.description),
       tx.pure.string(input.fileSize),
@@ -156,7 +196,7 @@ export function buildCreateRegisteredListingTransaction(input: {
       tx.pure.string(input.previewImageUrl),
       tx.pure.string(input.walrusBlobId),
       tx.pure.vector("u8", input.fileHashBytes),
-      tx.pure.u64(input.storageEpochs),
+      tx.pure.u64(String(input.storageEpochs)),
       tx.pure.u64(input.priceMist),
     ],
   });
@@ -188,6 +228,28 @@ export function buildBuyListingTransaction(input: {
   return tx;
 }
 
+export function buildDelistListingTransaction(input: {
+  listingId: string;
+  listingInitialSharedVersion?: string;
+}) {
+  const { packageId } = assertConfig();
+  const tx = new Transaction();
+  const listingArg = input.listingInitialSharedVersion
+    ? tx.sharedObjectRef({
+        objectId: input.listingId,
+        initialSharedVersion: input.listingInitialSharedVersion,
+        mutable: true,
+      })
+    : tx.object(input.listingId);
+
+  tx.moveCall({
+    target: `${packageId}::access_pass::delist_listing`,
+    arguments: [listingArg],
+  });
+
+  return tx;
+}
+
 export function buildMintAccessPointerTransaction(input: {
   fileHashBytes: number[];
   royaltyMist: string;
@@ -195,10 +257,11 @@ export function buildMintAccessPointerTransaction(input: {
   const { packageId, registryId } = assertRegistryConfig();
   const tx = new Transaction();
   const [royaltyCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(input.royaltyMist)]);
+  const registryArg = sharedOrObject(tx, registryId, getRegistryInitialSharedVersion(), true);
 
   tx.moveCall({
     target: `${packageId}::access_pass::mint_access_pointer`,
-    arguments: [tx.object(registryId), tx.pure.vector("u8", input.fileHashBytes), royaltyCoin],
+    arguments: [registryArg, tx.pure.vector("u8", input.fileHashBytes), royaltyCoin],
   });
 
   return tx;
@@ -213,26 +276,29 @@ export function buildStorageTopUpTransaction(input: {
   const { packageId, registryId } = assertRegistryConfig();
   const tx = new Transaction();
   const topUpTarget = getWalrusTopUpTarget();
-  const walrusSystemObjectId = getWalrusSystemObjectId();
+  const walrusSystemObjectId = asSuiObjectId(getWalrusSystemObjectId());
+  const registryArg = sharedOrObject(tx, registryId, getRegistryInitialSharedVersion(), true);
 
   tx.moveCall({
     target: `${packageId}::access_pass::extend_registered_storage`,
     arguments: [
-      tx.object(registryId),
+      registryArg,
       tx.pure.vector("u8", input.fileHashBytes),
-      tx.pure.u64(input.additionalEpochs),
+      tx.pure.u64(String(input.additionalEpochs)),
     ],
   });
 
-  if (topUpTarget && walrusSystemObjectId && input.blobObjectId) {
+  const blobObjectId = asSuiObjectId(input.blobObjectId);
+
+  if (topUpTarget && walrusSystemObjectId && blobObjectId) {
     const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(input.topUpMist)]);
 
     tx.moveCall({
       target: topUpTarget,
       arguments: [
         tx.object(walrusSystemObjectId),
-        tx.object(input.blobObjectId),
-        tx.pure.u64(input.additionalEpochs),
+        tx.object(blobObjectId),
+        tx.pure.u64(String(input.additionalEpochs)),
         paymentCoin,
       ],
     });
@@ -255,6 +321,10 @@ export function getBlobRegisteredEvent(transaction: TransactionLike) {
 
 export function getAccessPointerMintedEvent(transaction: TransactionLike) {
   return findEvent<AccessPointerMintedEvent>(transaction, "AccessPointerMinted");
+}
+
+export function getListingDelistedEvent(transaction: TransactionLike) {
+  return findEvent<ListingDelistedEvent>(transaction, "ListingDelisted");
 }
 
 export function getCreatedListingChange(transaction: TransactionLike) {

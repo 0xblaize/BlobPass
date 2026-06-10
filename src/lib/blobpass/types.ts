@@ -110,6 +110,7 @@ export type MarketplaceListing = {
 export type LibraryAssetView = {
   passId: string;
   listingId: string;
+  listingInitialSharedVersion?: string;
   blobObjectId?: string;
   title: string;
   category: string;

@@ -10,6 +10,7 @@ import {
   listRegistryInventory,
   listRegistryMarketplacePasses,
   mintRegistryAccessPointer,
+  syncRegistryDelist,
   syncRegistryPurchase,
   verifyRegistryOwnership,
 } from "./registry";
@@ -82,6 +83,10 @@ function getBlobRegistryId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_ID || "";
 }
 
+function getBlobRegistryInitialSharedVersion() {
+  return process.env.NEXT_PUBLIC_BLOBPASS_REGISTRY_INITIAL_SHARED_VERSION || "";
+}
+
 function getTatumRpcUrl() {
   return (
     process.env.TATUM_SUI_RPC_URL ||
@@ -134,6 +139,7 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
   return {
     passId: pass.id,
     listingId: pass.listingId,
+    listingInitialSharedVersion: pass.listingInitialSharedVersion,
     blobObjectId: pass.blobObjectId,
     title: fields.title,
     category: pass.category,
@@ -247,6 +253,34 @@ export async function syncPurchasedAccessPass({
   };
 }
 
+export async function syncDelistedAccessPass({
+  listingId,
+  sellerAddress,
+  passId,
+  transactionDigest,
+}: {
+  listingId: string;
+  sellerAddress: string;
+  passId?: string;
+  transactionDigest?: string;
+}) {
+  const pass = await syncRegistryDelist({
+    listingId,
+    sellerAddress,
+    passId,
+    transactionDigest,
+  });
+
+  if (!pass) {
+    return null;
+  }
+
+  return {
+    pass,
+    asset: mapPassToLibraryAsset(pass, sellerAddress),
+  };
+}
+
 export async function getDataAccessPass(passId: string) {
   return getRegistryPass(passId);
 }
@@ -276,6 +310,10 @@ export function getNativeSuiConfig() {
 
   if (!getBlobRegistryId()) {
     missing.push("NEXT_PUBLIC_BLOBPASS_REGISTRY_ID");
+  }
+
+  if (getBlobRegistryId() && !getBlobRegistryInitialSharedVersion()) {
+    missing.push("NEXT_PUBLIC_BLOBPASS_REGISTRY_INITIAL_SHARED_VERSION");
   }
 
   return {

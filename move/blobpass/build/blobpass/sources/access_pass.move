@@ -14,6 +14,7 @@ module blobpass::access_pass {
     const EDuplicateBlobHash: u64 = 2;
     const EUnknownBlobHash: u64 = 3;
     const ERoyaltyRequired: u64 = 4;
+    const ENotListingSeller: u64 = 5;
 
     public struct DataAccessPass has key, store {
         id: UID,
@@ -128,6 +129,12 @@ module blobpass::access_pass {
         seller: address,
         buyer: address,
         price: u64,
+    }
+
+    public struct ListingDelisted has copy, drop {
+        listing_id: ID,
+        pass_id: ID,
+        seller: address,
     }
 
     fun init(ctx: &mut TxContext) {
@@ -458,5 +465,26 @@ module blobpass::access_pass {
         });
 
         transfer::public_transfer(pass, buyer);
+    }
+
+    public entry fun delist_listing(
+        listing: &mut Listing,
+        ctx: &mut TxContext
+    ) {
+        let seller = tx_context::sender(ctx);
+        assert!(listing.seller == seller, ENotListingSeller);
+        assert!(option::is_some(&listing.pass), EListingAlreadySold);
+
+        let listing_id = object::uid_to_inner(&listing.id);
+        let pass = option::extract(&mut listing.pass);
+        let pass_id = object::uid_to_inner(&pass.id);
+
+        event::emit(ListingDelisted {
+            listing_id,
+            pass_id,
+            seller,
+        });
+
+        transfer::public_transfer(pass, seller);
     }
 }

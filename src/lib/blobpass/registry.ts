@@ -427,6 +427,39 @@ export async function syncRegistryPurchase({
   });
 }
 
+export async function syncRegistryDelist({
+  listingId,
+  sellerAddress,
+  passId,
+  transactionDigest,
+}: {
+  listingId: string;
+  sellerAddress: string;
+  passId?: string;
+  transactionDigest?: string;
+}) {
+  return withRegistryWrite((registry) => {
+    const pass = registry.passes.find(
+      (item) => item.listingId === listingId || (passId ? item.id === passId : false),
+    );
+
+    if (!pass || !matchesAddress(pass.seller, sellerAddress)) {
+      return null;
+    }
+
+    if (passId) {
+      pass.id = passId;
+    }
+
+    pass.listed = false;
+    pass.owner = sellerAddress;
+    pass.verificationMode = "tatum-object-owner";
+    pass.lastTransactionDigest = transactionDigest || pass.lastTransactionDigest;
+
+    return clonePass(pass);
+  });
+}
+
 export async function mintRegistryAccessPointer({
   fileHash,
   buyerAddress,

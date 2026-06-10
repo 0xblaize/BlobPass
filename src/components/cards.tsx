@@ -19,7 +19,9 @@ import {
 import { useState } from "react";
 import {
   buildBuyListingTransaction,
+  buildDelistListingTransaction,
   buildStorageTopUpTransaction,
+  getListingDelistedEvent,
   getListingPurchasedEvent,
   getTransferredPassChange,
 } from "@/lib/blobpass/sui";
@@ -202,6 +204,79 @@ function useStorageTopUp(asset: LibraryAssetView) {
   return { topUp, state, errorMessage };
 }
 
+function useDelist(asset: LibraryAssetView) {
+  const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const queryClient = useQueryClient();
+  const signAndExecute = useSignAndExecuteTransaction();
+  const [state, setState] = useState<"idle" | "signing" | "confirming" | "delisted" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function delist() {
+    if (!account?.address) {
+      setState("error");
+      setErrorMessage("Connect the seller wallet before delisting.");
+      return;
+    }
+
+    setState("signing");
+    setErrorMessage("");
+
+    try {
+      const transaction = buildDelistListingTransaction({
+        listingId: asset.listingId,
+        listingInitialSharedVersion: asset.listingInitialSharedVersion,
+      });
+
+      const txResult = await signAndExecute.mutateAsync({
+        transaction,
+      });
+
+      setState("confirming");
+
+      const finalized = await suiClient.waitForTransaction({
+        digest: txResult.digest,
+        options: {
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      const delistedEvent = getListingDelistedEvent(finalized);
+      const transferredPass = getTransferredPassChange(finalized);
+      const passId =
+        delistedEvent?.pass_id || (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : asset.passId);
+
+      const response = await fetch("/api/delist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingId: asset.listingId,
+          passId,
+          sellerAddress: account.address,
+          transactionDigest: txResult.digest,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Delist sync failed");
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
+        queryClient.invalidateQueries({ queryKey: ["marketplace"] }),
+      ]);
+      setState("delisted");
+    } catch (error) {
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Delist transaction failed.");
+    }
+  }
+
+  return { delist, state, errorMessage };
+}
+
 export function ListingCard({ item }: { item: MarketplaceListing }) {
   const { buy, state, account, errorMessage } = usePurchase(item);
 
@@ -288,7 +363,9 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
 export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const owned = asset.status === "Owned";
+  const listedByUser = asset.status === "Your Listing";
   const topUp = useStorageTopUp(asset);
+  const delist = useDelist(asset);
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "error">("idle");
   const [downloadError, setDownloadError] = useState("");
   const storageTone =
@@ -355,7 +432,28 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
           </div>
           {topUp.errorMessage ? <p className="mt-3 text-xs font-bold text-red-200">{topUp.errorMessage}</p> : null}
         </div>
-        {owned && asset.rawFileBlobId ? (
+        {listedByUser ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a className="button-secondary w-full" href="/marketplace">
+              <ExternalLink size={17} />
+              {asset.action}
+            </a>
+            <button
+              className="button-primary w-full"
+              disabled={delist.state === "signing" || delist.state === "confirming" || delist.state === "delisted"}
+              onClick={() => void delist.delist()}
+              type="button"
+            >
+              {delist.state === "signing"
+                ? "Sign Delist"
+                : delist.state === "confirming"
+                  ? "Confirming"
+                  : delist.state === "delisted"
+                    ? "Delisted"
+                    : "Delist"}
+            </button>
+          </div>
+        ) : owned && asset.rawFileBlobId ? (
           <button
             className="button-primary w-full"
             disabled={downloadState === "downloading"}
@@ -417,6 +515,7 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
           </a>
         )}
         {downloadError ? <p className="text-xs font-bold text-red-300">{downloadError}</p> : null}
+        {delist.errorMessage ? <p className="text-xs font-bold text-red-300">{delist.errorMessage}</p> : null}
       </div>
     </article>
   );
