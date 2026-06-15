@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 type RabbitSceneProps = {
   className?: string;
@@ -49,11 +50,14 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     scene.add(rim);
 
     let modelReady = false;
-    let isPointerDown = false;
-    let lastPointerX = 0;
-    let targetRotation = 0;
-    let currentRotation = 0;
     let isVisible = true;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enableZoom = true;
+    controls.autoRotate = !prefersReducedMotion;
+    controls.autoRotateSpeed = 2.0;
 
     const fitCameraToModel = () => {
       const box = new THREE.Box3().setFromObject(rabbitRoot);
@@ -64,7 +68,8 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
         visibleHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
 
       camera.position.set(center.x, center.y, center.z + distance * 1.35);
-      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
       camera.updateProjectionMatrix();
     };
 
@@ -120,38 +125,6 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
       if (modelReady) fitCameraToModel();
     };
 
-    const handlePointerDown = (event: PointerEvent) => {
-      isPointerDown = true;
-      lastPointerX = event.clientX;
-      renderer.domElement.setPointerCapture(event.pointerId);
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!isPointerDown) return;
-      const deltaX = event.clientX - lastPointerX;
-      lastPointerX = event.clientX;
-      targetRotation += deltaX * 0.012;
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      isPointerDown = false;
-      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
-        renderer.domElement.releasePointerCapture(event.pointerId);
-      }
-    };
-
-    const preventGestureZoom = (event: WheelEvent) => {
-      event.preventDefault();
-    };
-
-    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
-    renderer.domElement.addEventListener("pointermove", handlePointerMove);
-    renderer.domElement.addEventListener("pointerup", handlePointerUp);
-    renderer.domElement.addEventListener("pointercancel", handlePointerUp);
-    renderer.domElement.addEventListener("wheel", preventGestureZoom, {
-      passive: false,
-    });
-
     resize();
     window.addEventListener("resize", resize);
 
@@ -170,16 +143,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
         return;
       }
 
-      if (!prefersReducedMotion && !isPointerDown) {
-        targetRotation += 0.01;
-      }
-
-      currentRotation = THREE.MathUtils.lerp(
-        currentRotation,
-        targetRotation,
-        0.12,
-      );
-      rabbitRoot.rotation.y = currentRotation;
+      controls.update();
       renderer.render(scene, camera);
       frame = window.requestAnimationFrame(animate);
     };
@@ -190,11 +154,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
       visibilityObserver.disconnect();
-      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
-      renderer.domElement.removeEventListener("pointermove", handlePointerMove);
-      renderer.domElement.removeEventListener("pointerup", handlePointerUp);
-      renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
-      renderer.domElement.removeEventListener("wheel", preventGestureZoom);
+      controls.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
       scene.traverse((object) => {
