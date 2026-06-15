@@ -170,8 +170,8 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
         return;
       }
 
-      if (!prefersReducedMotion && !isPointerDown && mount.matches(":hover")) {
-        targetRotation += 0.006;
+      if (!prefersReducedMotion && !isPointerDown) {
+        targetRotation += 0.01;
       }
 
       currentRotation = THREE.MathUtils.lerp(
