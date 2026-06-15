@@ -56,7 +56,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enableZoom = true;
-    controls.autoRotate = !prefersReducedMotion;
+    controls.autoRotate = false;
     controls.autoRotateSpeed = 2.0;
 
     const fitCameraToModel = () => {
@@ -143,6 +143,10 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
         return;
       }
 
+      if (!prefersReducedMotion) {
+        controls.autoRotate = mount.matches(":hover");
+      }
+      
       controls.update();
       renderer.render(scene, camera);
       frame = window.requestAnimationFrame(animate);
