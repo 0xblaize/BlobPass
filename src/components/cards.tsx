@@ -8,6 +8,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  BadgeCheck,
   Clock,
   Download,
   ExternalLink,
@@ -38,6 +39,18 @@ function hexToBytes(value: string) {
   }
 
   return bytes;
+}
+
+function VerifiedBadge({ label = "BlobPass Verified" }: { label?: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-sky-300/40 bg-sky-300/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-300"
+      title="BlobPass Team verified creator"
+    >
+      <BadgeCheck size={12} strokeWidth={2.5} />
+      {label}
+    </span>
+  );
 }
 
 function PreviewImage({
@@ -284,10 +297,16 @@ export function ListingCard({ item }: { item: MarketplaceListing }) {
     <article className="panel overflow-hidden rounded-lg">
       <PreviewImage heightClass="h-44" item={item} />
       <div className="space-y-4 p-5">
-        <h3 className="text-xl font-black">{item.title}</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-xl font-black">{item.title}</h3>
+          {item.verified ? <VerifiedBadge /> : null}
+        </div>
         <p className="min-h-12 text-sm leading-6 text-zinc-400">{item.description}</p>
         <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span>{item.seller}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {item.seller}
+            {item.verified ? <BadgeCheck className="text-sky-300" size={14} strokeWidth={2.5} /> : null}
+          </span>
           <span>{item.date}</span>
         </div>
         <div className="flex items-end justify-between gap-4">
@@ -323,13 +342,17 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
           <div className="flex flex-wrap gap-2">
             <span className="chip bg-cyan-300 text-black">Featured</span>
             <span className="chip">Walrus Storage</span>
+            {item.verified ? <VerifiedBadge /> : null}
           </div>
           <h2 className="title text-2xl leading-tight">{item.title}</h2>
           <p className="leading-7 text-zinc-300">{item.description} Processed via Sui-parallel clusters.</p>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <div className="text-xs font-bold text-zinc-500">SELLER</div>
-              <div>{item.seller}</div>
+              <div className="inline-flex items-center gap-1.5">
+                {item.seller}
+                {item.verified ? <BadgeCheck className="text-sky-300" size={14} strokeWidth={2.5} /> : null}
+              </div>
             </div>
             <div>
               <div className="text-xs font-bold text-zinc-500">SIZE</div>
@@ -394,8 +417,12 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs font-black uppercase text-cyan-300">{asset.category}</div>
-            <h3 className="mt-1 text-xl font-black">{asset.title}</h3>
+            <h3 className="mt-1 text-xl font-black inline-flex items-center gap-2">
+              {asset.title}
+              {asset.verified ? <BadgeCheck className="text-sky-300" size={18} strokeWidth={2.5} /> : null}
+            </h3>
           </div>
+          {asset.verified ? <VerifiedBadge /> : null}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 text-xs text-zinc-400">
           <span>{asset.date}</span>

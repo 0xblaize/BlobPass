@@ -63,22 +63,6 @@ export type UploadReceipt = {
   storageEndEpoch?: number;
 };
 
-export type TransactionCallSpec = {
-  kind: "moveCall" | "kioskAction";
-  target: string;
-  arguments: Record<string, string | number | boolean | null>;
-};
-
-export type TransactionSpec = {
-  chain: "sui";
-  title: string;
-  description: string;
-  packageId: string;
-  kioskId: string;
-  calls: TransactionCallSpec[];
-  requiresWalletSignature: boolean;
-};
-
 export type MarketplaceListing = {
   id: string;
   passId: string;
@@ -105,6 +89,7 @@ export type MarketplaceListing = {
   storageDaysRemaining: number;
   storageHealth: StorageHealth;
   royaltyBps: number;
+  verified: boolean;
 };
 
 export type LibraryAssetView = {
@@ -132,6 +117,7 @@ export type LibraryAssetView = {
   storageHealth: StorageHealth;
   storageRenewalLabel: string;
   royaltyBps: number;
+  verified: boolean;
 };
 
 export type LibraryStats = {

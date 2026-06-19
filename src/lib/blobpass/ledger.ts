@@ -1,4 +1,5 @@
 import { dateLabel, formatBytes, mistToSui, shortAddress, shortBlob } from "./format";
+import { isVerifiedCreator } from "./verified";
 import {
   findRegistryPassByBlobId,
   findRegistryPassByFileHash,
@@ -75,8 +76,12 @@ function getBlobPassPackageId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
 }
 
-function getPlatformKioskId() {
-  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
+function getEcosystemObjectId() {
+  return (
+    process.env.NEXT_PUBLIC_BLOBPASS_ECOSYSTEM_ID ||
+    process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID ||
+    ""
+  );
 }
 
 function getBlobRegistryId() {
@@ -126,6 +131,7 @@ function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceLis
     storageDaysRemaining,
     storageHealth: getStorageHealth(storageDaysRemaining),
     royaltyBps: pass.royaltyBps,
+    verified: isVerifiedCreator(pass.originalUploader) || isVerifiedCreator(pass.seller),
   };
 }
 
@@ -166,6 +172,7 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
         ? `${storageDaysRemaining} day${storageDaysRemaining === 1 ? "" : "s"} remaining`
         : "Storage window expired",
     royaltyBps: pass.royaltyBps,
+    verified: isVerifiedCreator(pass.originalUploader) || isVerifiedCreator(pass.seller),
   };
 }
 
@@ -304,8 +311,8 @@ export function getNativeSuiConfig() {
     missing.push("NEXT_PUBLIC_BLOBPASS_PACKAGE_ID");
   }
 
-  if (!getPlatformKioskId()) {
-    missing.push("NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID");
+  if (!getEcosystemObjectId()) {
+    missing.push("NEXT_PUBLIC_BLOBPASS_ECOSYSTEM_ID");
   }
 
   if (!getBlobRegistryId()) {
@@ -376,17 +383,15 @@ export async function topUpStorage({
   };
 }
 
-export async function verifyAccessPassOwnership(address: string, passId: string) {
-  const registryPass = await getRegistryPass(passId);
+function isOnChainObjectId(value: string) {
+  return /^0x[0-9a-fA-F]{1,64}$/.test(value);
+}
 
-  if (registryPass?.verificationMode === "registry") {
-    return verifyRegistryOwnership(address, passId);
-  }
-
+async function fetchSuiObjectOwner(passId: string): Promise<string | null> {
   const tatumRpcUrl = getTatumRpcUrl();
 
-  if (!process.env.TATUM_SUI_RPC_URL && !process.env.NEXT_PUBLIC_TATUM_SUI_RPC) {
-    return false;
+  if (!tatumRpcUrl) {
+    return null;
   }
 
   const response = await fetch(tatumRpcUrl, {
@@ -410,16 +415,33 @@ export async function verifyAccessPassOwnership(address: string, passId: string)
   });
 
   if (!response.ok) {
-    throw new Error(`Tatum Sui RPC failed with HTTP ${response.status}`);
+    throw new Error(`Sui RPC ownership lookup failed with HTTP ${response.status}`);
   }
 
   const payload: unknown = await response.json();
-  const owner = extractSuiAddressOwner(payload);
-
-  return owner ? owner.toLowerCase() === address.toLowerCase() : false;
+  return extractSuiAddressOwner(payload);
 }
 
-function extractSuiAddressOwner(payload: unknown) {
+export async function verifyAccessPassOwnership(address: string, passId: string) {
+  // The on-chain BlobPass ledger is the source of truth. The local JSON
+  // registry is treated strictly as a fast indexer / read cache. We only
+  // fall back to it for synthetic demo ids that never made it on-chain.
+  if (isOnChainObjectId(passId)) {
+    const chainOwner = await fetchSuiObjectOwner(passId);
+
+    if (chainOwner) {
+      return chainOwner.toLowerCase() === address.toLowerCase();
+    }
+
+    // Object exists in our index but RPC could not return an owner. Refuse
+    // access rather than silently trusting the local JSON cache.
+    return false;
+  }
+
+  return verifyRegistryOwnership(address, passId);
+}
+
+function extractSuiAddressOwner(payload: unknown): string {
   if (!payload || typeof payload !== "object") {
     return "";
   }
@@ -427,12 +449,18 @@ function extractSuiAddressOwner(payload: unknown) {
   const root = payload as Record<string, unknown>;
   const result = root.result as Record<string, unknown> | undefined;
   const data = result?.data as Record<string, unknown> | undefined;
-  const owner = data?.owner as Record<string, unknown> | string | undefined;
+  const owner = data?.owner;
 
   if (typeof owner === "string") {
     return owner;
   }
 
-  const addressOwner = owner?.AddressOwner;
-  return typeof addressOwner === "string" ? addressOwner : "";
+  if (owner && typeof owner === "object") {
+    const addressOwner = (owner as Record<string, unknown>).AddressOwner;
+    if (typeof addressOwner === "string") {
+      return addressOwner;
+    }
+  }
+
+  return "";
 }

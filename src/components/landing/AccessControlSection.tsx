@@ -20,7 +20,7 @@ const steps = [
     number: "03",
     label: "Access Pass",
     description:
-      "Mint a Sui Kiosk object that acts as the cryptographic key for buyers.",
+      "Mint a DataAccessPass Move object on Sui that acts as the cryptographic key for buyers.",
   },
   {
     icon: Link2,

@@ -73,7 +73,7 @@ export function LibraryGrid({
         <StatCard
           icon={<Plus size={22} />}
           label="Your Listings"
-          note="Active kiosk listings"
+          note="Active access-pass listings"
           value={stats.activeListings}
         />
         <StatCard

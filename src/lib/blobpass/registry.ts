@@ -106,7 +106,7 @@ function normalizePassRecord(pass: DataAccessPassObject): DataAccessPassObject {
   return {
     ...pass,
     id: pass.id || `registry-pass-${Date.now()}`,
-    listingId: pass.listingId || (pass as DataAccessPassObject & { listingKioskId?: string }).listingKioskId || pass.id,
+    listingId: pass.listingId || pass.id,
     listingInitialSharedVersion: pass.listingInitialSharedVersion || "",
     blobObjectId: pass.blobObjectId || "",
     owner: pass.owner || pass.seller || DEMO_SELLER_ADDRESS,

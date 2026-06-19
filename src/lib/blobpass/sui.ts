@@ -50,11 +50,19 @@ function getPackageId() {
 }
 
 function getEcosystemId() {
-  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID || "";
+  return (
+    process.env.NEXT_PUBLIC_BLOBPASS_ECOSYSTEM_ID ||
+    process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID ||
+    ""
+  );
 }
 
 function getEcosystemInitialSharedVersion() {
-  return process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_INITIAL_SHARED_VERSION || "";
+  return (
+    process.env.NEXT_PUBLIC_BLOBPASS_ECOSYSTEM_INITIAL_SHARED_VERSION ||
+    process.env.NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_INITIAL_SHARED_VERSION ||
+    ""
+  );
 }
 
 function getRegistryId() {
@@ -83,7 +91,7 @@ function assertConfig() {
 
   if (!packageId || !ecosystemId) {
     throw new Error(
-      "BlobPass Sui environment is incomplete. Add NEXT_PUBLIC_BLOBPASS_PACKAGE_ID and NEXT_PUBLIC_BLOBPASS_KIOSK_ECOSYSTEM_ID.",
+      "BlobPass Sui environment is incomplete. Add NEXT_PUBLIC_BLOBPASS_PACKAGE_ID and NEXT_PUBLIC_BLOBPASS_ECOSYSTEM_ID.",
     );
   }
 
@@ -126,41 +134,6 @@ function sharedOrObject(tx: Transaction, objectId: string, initialSharedVersion:
         mutable,
       })
     : tx.object(objectId);
-}
-
-export function buildCreateListingTransaction(input: {
-  title: string;
-  description: string;
-  fileSize: string;
-  fileType: string;
-  previewImageUrl: string;
-  walrusBlobId: string;
-  priceMist: string;
-}) {
-  const { packageId, ecosystemId } = assertConfig();
-  const tx = new Transaction();
-  const ecosystemArg = sharedOrObject(
-    tx,
-    ecosystemId,
-    getEcosystemInitialSharedVersion(),
-    true,
-  );
-
-  tx.moveCall({
-    target: `${packageId}::access_pass::create_listing`,
-    arguments: [
-      ecosystemArg,
-      tx.pure.string(input.title),
-      tx.pure.string(input.description),
-      tx.pure.string(input.fileSize),
-      tx.pure.string(input.fileType),
-      tx.pure.string(input.previewImageUrl),
-      tx.pure.string(input.walrusBlobId),
-      tx.pure.u64(input.priceMist),
-    ],
-  });
-
-  return tx;
 }
 
 export function buildCreateRegisteredListingTransaction(input: {

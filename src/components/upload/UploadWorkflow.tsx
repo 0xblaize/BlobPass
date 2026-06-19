@@ -17,7 +17,6 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { suiToMist } from "@/lib/blobpass/format";
 import {
-  buildCreateListingTransaction,
   buildCreateRegisteredListingTransaction,
   buildMintAccessPointerTransaction,
   extractPassIdFromListingObject,
@@ -343,31 +342,26 @@ export function UploadWorkflow() {
       const uploadPayload = payload as UploadResponse;
       const priceMist = uploadPayload.asset.priceMist || suiToMist(priceSui);
       const storageEpochCount = Math.max(1, Number.parseInt(storageEpochs, 10) || uploadPayload.asset.storageEpochs || 5);
-      const useRegisteredRegistry = uploadPayload.nativeSui.configured;
+
+      if (!uploadPayload.nativeSui.configured) {
+        throw new Error(
+          `BlobPass on-chain registry is not configured. Missing: ${uploadPayload.nativeSui.missing.join(", ")}`,
+        );
+      }
 
       setStatus("signing");
 
-      const transaction = useRegisteredRegistry
-        ? buildCreateRegisteredListingTransaction({
-            title: uploadPayload.asset.title,
-            description: uploadPayload.asset.description,
-            fileSize: uploadPayload.asset.file_size,
-            fileType: uploadPayload.asset.file_type,
-            previewImageUrl: uploadPayload.previewUrl ?? "",
-            walrusBlobId: uploadPayload.rawFileBlobId,
-            fileHashBytes: hashBytes,
-            storageEpochs: storageEpochCount,
-            priceMist,
-          })
-        : buildCreateListingTransaction({
-            title: uploadPayload.asset.title,
-            description: uploadPayload.asset.description,
-            fileSize: uploadPayload.asset.file_size,
-            fileType: uploadPayload.asset.file_type,
-            previewImageUrl: uploadPayload.previewUrl ?? "",
-            walrusBlobId: uploadPayload.rawFileBlobId,
-            priceMist,
-          });
+      const transaction = buildCreateRegisteredListingTransaction({
+        title: uploadPayload.asset.title,
+        description: uploadPayload.asset.description,
+        fileSize: uploadPayload.asset.file_size,
+        fileType: uploadPayload.asset.file_type,
+        previewImageUrl: uploadPayload.previewUrl ?? "",
+        walrusBlobId: uploadPayload.rawFileBlobId,
+        fileHashBytes: hashBytes,
+        storageEpochs: storageEpochCount,
+        priceMist,
+      });
 
       const txResult = await signAndExecute.mutateAsync({
         transaction,

@@ -15,6 +15,9 @@ module blobpass::access_pass {
     const EUnknownBlobHash: u64 = 3;
     const ERoyaltyRequired: u64 = 4;
     const ENotListingSeller: u64 = 5;
+    const ESupplyCapReached: u64 = 6;
+
+    const MAX_REGISTERED_BLOBS: u64 = 500;
 
     public struct DataAccessPass has key, store {
         id: UID,
@@ -138,7 +141,7 @@ module blobpass::access_pass {
     }
 
     fun init(ctx: &mut TxContext) {
-        // Create the ecosystem shared object to act as our Kiosk Ecosystem ID
+        // Create the shared Ecosystem object used by every listing call in the custom access ledger
         transfer::share_object(Ecosystem {
             id: object::new(ctx),
         });
@@ -270,6 +273,7 @@ module blobpass::access_pass {
         ctx: &mut TxContext
     ) {
         assert!(!table::contains(&registry.hash_index, file_hash), EDuplicateBlobHash);
+        assert!(registry.blob_count < MAX_REGISTERED_BLOBS, ESupplyCapReached);
 
         let seller = tx_context::sender(ctx);
         let storage_start_epoch = tx_context::epoch(ctx);
