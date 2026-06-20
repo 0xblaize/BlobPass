@@ -22,6 +22,78 @@ import {
 } from "@/lib/blobpass/sui";
 import type { UploadReceipt } from "@/lib/blobpass/types";
 
+const PREVIEW_MAX_DIM = 1200;
+const PREVIEW_QUALITY = 0.85;
+
+type PreviewMeta = {
+  thumbDataUrl: string;
+  originalBytes: number;
+  resizedBytes: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * Auto-resize any uploaded preview image down to PREVIEW_MAX_DIM on the
+ * longest edge and re-encode to JPEG at PREVIEW_QUALITY. Keeps Walrus
+ * blob sizes small and consistent regardless of what the user picks.
+ * Returns the new File ready for upload + a thumbnail data URL for UI.
+ */
+async function resizePreviewImage(file: File): Promise<{
+  file: File;
+  meta: PreviewMeta;
+}> {
+  const bitmap = await createImageBitmap(file);
+  const srcW = bitmap.width;
+  const srcH = bitmap.height;
+  const scale = Math.min(1, PREVIEW_MAX_DIM / Math.max(srcW, srcH));
+  const dstW = Math.max(1, Math.round(srcW * scale));
+  const dstH = Math.max(1, Math.round(srcH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = dstW;
+  canvas.height = dstH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close?.();
+    throw new Error("Canvas 2D context unavailable");
+  }
+  ctx.drawImage(bitmap, 0, 0, dstW, dstH);
+  bitmap.close?.();
+
+  const mime = "image/jpeg";
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Image resize failed"))),
+      mime,
+      PREVIEW_QUALITY,
+    );
+  });
+
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "preview";
+  const resized = new File([blob], `${baseName}.jpg`, {
+    type: mime,
+    lastModified: Date.now(),
+  });
+
+  return {
+    file: resized,
+    meta: {
+      thumbDataUrl: canvas.toDataURL(mime, PREVIEW_QUALITY),
+      originalBytes: file.size,
+      resizedBytes: resized.size,
+      width: dstW,
+      height: dstH,
+    },
+  };
+}
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 type UploadResponse = {
   success: true;
   ok: true;
@@ -145,6 +217,31 @@ export function UploadWorkflow() {
   const signAndExecute = useSignAndExecuteTransaction();
   const [assetFile, setAssetFile] = useState<File | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewMeta, setPreviewMeta] = useState<PreviewMeta | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  async function handlePreviewSelected(file: File | null) {
+    setPreviewError(null);
+    if (!file) {
+      setPreviewFile(null);
+      setPreviewMeta(null);
+      return;
+    }
+    setPreviewBusy(true);
+    try {
+      const { file: resized, meta } = await resizePreviewImage(file);
+      setPreviewFile(resized);
+      setPreviewMeta(meta);
+    } catch (error) {
+      console.error("[blobpass] preview resize failed:", error);
+      setPreviewFile(file);
+      setPreviewMeta(null);
+      setPreviewError("Could not resize — uploading original file.");
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Digital Asset");
@@ -490,20 +587,67 @@ export function UploadWorkflow() {
             </div>
           ) : null}
 
-          {/* Preview image */}
+          {/* Preview image — auto-resizes to ≤1200px JPEG before upload */}
           <div className="mt-6 grid gap-6 md:grid-cols-2">
             <div>
               <div className="label">PUBLIC PREVIEW IMAGE</div>
               <input
                 accept="image/*"
                 className="input-box mt-2"
-                onChange={(event) => setPreviewFile(event.target.files?.[0] ?? null)}
+                disabled={previewBusy}
+                onChange={(event) => handlePreviewSelected(event.target.files?.[0] ?? null)}
                 type="file"
               />
+
+              {/* Status block */}
+              {previewBusy && (
+                <div className="mono mt-3 text-[11px] tracking-[0.18em] text-[var(--signal-deep)]">
+                  [ RESIZING · PLEASE WAIT ]
+                </div>
+              )}
+
+              {previewError && !previewBusy && (
+                <div className="mono mt-3 text-[11px] tracking-[0.18em] text-[var(--ink-60)]">
+                  [ ! ] {previewError}
+                </div>
+              )}
+
+              {previewMeta && !previewBusy && (
+                <div className="mono mt-4 flex items-start gap-4">
+                  {/* Thumbnail */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt="Resized preview"
+                    className="border border-[var(--ink-40)]"
+                    src={previewMeta.thumbDataUrl}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      objectFit: "cover",
+                    }}
+                  />
+                  <div className="flex flex-col gap-1 text-[11px] tracking-[0.12em] text-[var(--ink-60)]">
+                    <span style={{ color: "var(--signal-deep)" }}>
+                      [ READY · {previewMeta.width}×{previewMeta.height} ]
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {formatBytes(previewMeta.originalBytes)} →{" "}
+                      <span style={{ color: "var(--ink)" }}>
+                        {formatBytes(previewMeta.resizedBytes)}
+                      </span>
+                    </span>
+                    <span className="text-[var(--ink-40)]">
+                      ENCODED · JPEG · Q{Math.round(PREVIEW_QUALITY * 100)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             <p className="mono text-[12px] leading-7 text-[var(--ink-60)]">
               The raw asset is stored as a hidden blob. The marketplace receives only
-              the public metadata and preview image you provide here.
+              the public metadata and preview image you provide here. Any image you
+              pick is auto-resized to {PREVIEW_MAX_DIM}px on the longest edge — no
+              giant uploads, no broken cards.
             </p>
           </div>
         </Section>

@@ -16,7 +16,7 @@ export function LandingPage() {
       <div className="zone-ink relative overflow-hidden">
         <Header landing />
         <main className="shell relative">
-          <section className="flex flex-col items-stretch gap-10 pb-24 pt-16 md:flex-row md:items-center md:gap-12 md:pb-32 md:pt-24">
+          <section className="flex flex-col items-stretch gap-10 pb-24 pt-8 md:flex-row md:items-center md:gap-12 md:pb-32 md:pt-12">
             {/* LEFT: typographic mass (≈ 7/12) */}
             <div className="min-w-0 md:basis-[58%]">
               <div className="mb-8 flex items-center gap-3">
