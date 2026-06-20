@@ -22,6 +22,8 @@ type IndexListingBody = {
   storageEpochDurationDays?: number;
   originalUploader?: string;
   royaltyBps?: number;
+  totalSupply?: number;
+  passesMinted?: number;
   transactionDigest?: string;
   fields?: {
     title?: string;
@@ -72,6 +74,8 @@ export async function POST(request: NextRequest) {
       storageEpochDurationDays: body.storageEpochDurationDays,
       originalUploader: body.originalUploader,
       royaltyBps: body.royaltyBps,
+      totalSupply: body.totalSupply,
+      passesMinted: body.passesMinted,
       transactionDigest: body.transactionDigest,
       fields: {
         title: body.fields.title,

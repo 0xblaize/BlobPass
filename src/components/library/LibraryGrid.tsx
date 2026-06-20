@@ -2,10 +2,9 @@
 
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LibraryCard, StatCard } from "@/components/cards";
+import { LibraryCard } from "@/components/cards";
 import type { LibraryAssetView, LibraryStats } from "@/lib/blobpass/types";
 
 type LibraryResponse = {
@@ -15,6 +14,9 @@ type LibraryResponse = {
   stats: LibraryStats;
 };
 
+type TabKey = "All Assets" | "Purchased" | "My Listings";
+type ViewMode = "table" | "grid";
+
 export function LibraryGrid({
   initialAssets,
   initialStats,
@@ -23,7 +25,9 @@ export function LibraryGrid({
   initialStats: LibraryStats;
 }) {
   const account = useCurrentAccount();
-  const [tab, setTab] = useState<"All Assets" | "Purchased" | "My Listings">("All Assets");
+  const [tab, setTab] = useState<TabKey>("All Assets");
+  const [view, setView] = useState<ViewMode>("table");
+
   const libraryQuery = useQuery<LibraryResponse>({
     queryKey: ["library", account?.address ?? "disconnected"],
     queryFn: async () => {
@@ -49,133 +53,323 @@ export function LibraryGrid({
   const assets = libraryQuery.data?.assets ?? initialAssets;
   const stats = libraryQuery.data?.stats ?? initialStats;
   const syncing = libraryQuery.isFetching;
+
   const filteredAssets = useMemo(() => {
     if (tab === "Purchased") {
-      return assets.filter((asset) => asset.status === "Owned");
+      return assets.filter((a) => a.status === "Owned");
     }
-
     if (tab === "My Listings") {
-      return assets.filter((asset) => asset.status === "Your Listing");
+      return assets.filter((a) => a.status === "Your Listing");
     }
-
     return assets;
   }, [assets, tab]);
 
   return (
     <>
-      <section className="mt-12 grid gap-6 md:grid-cols-3">
-        <StatCard
-          icon={<ShieldCheck size={22} />}
-          label="Owned Assets"
-          note="Verified by access pass ownership"
+      {/* ───── Stats strip (mono k/v, no card chrome) ───── */}
+      <section className="mt-16 grid grid-cols-1 gap-px border-y border-[var(--ink-16)] bg-[var(--ink-16)] md:grid-cols-3">
+        <StatBlock
+          num="01"
+          label="OWNED ASSETS"
           value={stats.ownedAssets}
+          note="Verified by access-pass ownership"
         />
-        <StatCard
-          icon={<Plus size={22} />}
-          label="Your Listings"
-          note="Active access-pass listings"
+        <StatBlock
+          num="02"
+          label="ACTIVE LISTINGS"
           value={stats.activeListings}
+          note="Live access-pass listings"
         />
-        <StatCard
-          icon={<Wallet size={22} />}
-          label="Total Earnings"
-          note="Settled sales recorded in BlobPass"
+        <StatBlock
+          num="03"
+          label="TOTAL EARNINGS"
           value={stats.totalEarnings}
+          note="Settled sales recorded in BlobPass"
         />
       </section>
 
+      {/* ───── Controls bar ───── */}
       <section className="mt-12">
-        <div className="flex flex-wrap items-center justify-between gap-5 border-b border-white/10 pb-6">
-          <div className="panel inline-flex rounded-lg p-1">
-            {(["All Assets", "Purchased", "My Listings"] as const).map((item) => (
-              <button
-                className={`h-11 rounded-md px-7 font-bold ${
-                  tab === item ? "bg-cyan-300 text-black" : "text-zinc-300"
-                }`}
-                key={item}
-                onClick={() => setTab(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink-16)] pb-4">
+          <div className="flex flex-wrap items-end gap-6">
+            <div>
+              <div className="section-num">FILTER</div>
+              <div className="mono mt-2 flex items-center gap-3 text-[12px] tracking-[0.16em]">
+                {(["All Assets", "Purchased", "My Listings"] as const).map((item, i) => {
+                  const active = tab === item;
+                  return (
+                    <div className="flex items-center gap-3" key={item}>
+                      {i > 0 && <span className="text-[var(--ink-40)]">·</span>}
+                      <button
+                        className={
+                          active
+                            ? "text-[var(--ink)] underline decoration-[var(--signal)] decoration-2 underline-offset-[6px]"
+                            : "text-[var(--ink-60)] hover:text-[var(--ink)]"
+                        }
+                        onClick={() => setTab(item)}
+                        type="button"
+                      >
+                        {item.toUpperCase()}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-5 text-sm text-zinc-400">
-            <span>Showing {filteredAssets.length} results</span>
+
+          <div className="flex flex-wrap items-end gap-6">
+            <div>
+              <div className="section-num">VIEW</div>
+              <div className="mono mt-2 flex border border-[var(--ink-40)] text-[11px] tracking-[0.16em]">
+                <button
+                  className={`px-3 py-1.5 ${
+                    view === "table"
+                      ? "bg-[var(--ink)] text-[var(--paper)]"
+                      : "text-[var(--ink-60)] hover:text-[var(--ink)]"
+                  }`}
+                  onClick={() => setView("table")}
+                  type="button"
+                >
+                  TABLE
+                </button>
+                <button
+                  className={`border-l border-[var(--ink-40)] px-3 py-1.5 ${
+                    view === "grid"
+                      ? "bg-[var(--ink)] text-[var(--paper)]"
+                      : "text-[var(--ink-60)] hover:text-[var(--ink)]"
+                  }`}
+                  onClick={() => setView("grid")}
+                  type="button"
+                >
+                  GRID
+                </button>
+              </div>
+            </div>
+
+            <div className="mono text-right text-[11px] tracking-[0.12em] text-[var(--ink-60)]">
+              <div className="section-num">COUNT</div>
+              <div className="mt-2 tabular-nums">
+                {String(filteredAssets.length).padStart(3, "0")} / {String(assets.length).padStart(3, "0")}
+              </div>
+            </div>
+
             <button
-              className="button-secondary min-h-10 px-4"
+              className="btn"
               disabled={syncing || !account?.address}
               onClick={() => void libraryQuery.refetch()}
+              type="button"
             >
-              <Zap size={17} /> {syncing ? "Syncing..." : "Sync Wallet"}
+              {syncing ? "[ SYNCING... ]" : "[ SYNC WALLET ]"}
             </button>
           </div>
         </div>
 
         {!account?.address ? (
-          <p className="mt-6 text-sm font-bold text-amber-300">
-            Connect a Sui wallet to sync your BlobPass holdings and unlock secure downloads.
-          </p>
+          <div className="mono mt-4 flex items-center gap-3 border border-[var(--ink-40)] px-4 py-3 text-[12px] tracking-[0.04em]">
+            <span className="text-[var(--signal-deep)]">!</span>
+            <span>Connect a Sui wallet to sync your BlobPass holdings and unlock secure downloads.</span>
+          </div>
         ) : null}
 
-        {filteredAssets.length > 0 ? (
-          <div className="mt-10 grid gap-7 md:grid-cols-2 xl:grid-cols-3">
-            {filteredAssets.map((asset) => (
-              <LibraryCard asset={asset} key={asset.passId} />
-            ))}
-            <Link
-              className="grid min-h-[360px] place-items-center rounded-lg border border-dashed border-white/16 p-8 text-center hover:border-cyan-300/60"
-              href="/upload"
-            >
-              <div>
-                <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-zinc-900">
-                  <Plus size={30} />
-                </div>
-                <h3 className="title text-2xl">List New Asset</h3>
-                <p className="mt-4 text-zinc-400">Upload your files to Walrus and start earning SUI today.</p>
-              </div>
-            </Link>
-          </div>
-        ) : assets.length > 0 ? (
-          <div className="panel mt-10 rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-            <div className="mx-auto max-w-2xl">
-              <h3 className="title text-2xl text-white">Nothing in this tab yet.</h3>
-              <p className="mt-4 text-sm leading-7 text-zinc-400">
-                Your wallet is connected and synced, but the current library filter came back empty.
-              </p>
-              <div className="mt-8 flex justify-center">
+        {/* ───── Empty states ───── */}
+        {filteredAssets.length === 0 ? (
+          assets.length > 0 ? (
+            <EmptyBlock
+              title="Nothing in this tab."
+              body="The wallet is synced, but the current filter returned no rows."
+              cta={
                 <button
-                  className="button-primary min-h-12 min-w-[190px] rounded-full"
+                  className="btn"
                   onClick={() => setTab("All Assets")}
                   type="button"
                 >
-                  Show All Assets
+                  [ SHOW ALL ]
                 </button>
-              </div>
-            </div>
-          </div>
+              }
+            />
+          ) : (
+            <EmptyBlock
+              title={
+                account?.address
+                  ? "Wallet has no unlocked files yet."
+                  : "Connect a wallet to see your files."
+              }
+              body="BlobPass checks the Sui wallet against access-pass ownership before enabling downloads. Once an asset is bought or listed, it surfaces here automatically."
+              cta={
+                <div className="flex flex-wrap gap-3">
+                  <Link className="button-primary" href="/marketplace">
+                    [ EXPLORE MARKETPLACE ]
+                  </Link>
+                  <Link className="button-secondary" href="/upload">
+                    [ UPLOAD FILE ]
+                  </Link>
+                </div>
+              }
+            />
+          )
+        ) : view === "table" ? (
+          <LibraryTable assets={filteredAssets} />
         ) : (
-          <div className="panel mt-10 rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-            <div className="mx-auto max-w-2xl">
-              <h3 className="title text-2xl text-white">
-                {account?.address ? "Your wallet has no unlocked files yet." : "Connect a wallet to see your files."}
-              </h3>
-              <p className="mt-4 text-sm leading-7 text-zinc-400">
-                Blob Pass checks your Sui wallet against access-pass ownership before enabling downloads.
-                Once you buy or list an asset, it will show up here automatically.
-              </p>
-              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-                <Link className="button-primary min-h-12 min-w-[190px] rounded-full" href="/marketplace">
-                  Explore Marketplace
-                </Link>
-                <Link className="button-secondary min-h-12 min-w-[190px] rounded-full" href="/upload">
-                  Upload File
-                </Link>
+          <div className="mt-10 grid gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-3">
+            {filteredAssets.map((asset) => (
+              <div className="bg-[var(--paper)]" key={asset.passId}>
+                <LibraryCard asset={asset} />
               </div>
-            </div>
+            ))}
+            <Link
+              className="surface surface-interactive grid min-h-[280px] place-items-center bg-[var(--paper)] p-8 text-center"
+              href="/upload"
+            >
+              <div>
+                <div className="section-num">+ NEW</div>
+                <h3 className="display mt-3 text-[28px]">List a new asset.</h3>
+                <p className="mono mt-3 max-w-[36ch] text-[12px] leading-6 text-[var(--ink-60)]">
+                  Stream a blob to Walrus and mint its access pass on Sui.
+                </p>
+              </div>
+            </Link>
           </div>
         )}
       </section>
     </>
+  );
+}
+
+/* ─────────────── Sub-components ─────────────── */
+
+function StatBlock({
+  num,
+  label,
+  value,
+  note,
+}: {
+  num: string;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 bg-[var(--paper)] p-6">
+      <div className="mono flex items-center justify-between text-[11px] tracking-[0.16em] text-[var(--ink-40)]">
+        <span>{num}</span>
+        <span>{label}</span>
+      </div>
+      <div className="display text-[44px] leading-none tabular-nums">{value}</div>
+      <div className="ascii-rule" />
+      <p className="mono text-[11px] leading-5 text-[var(--ink-60)]">{note}</p>
+    </div>
+  );
+}
+
+function StatusTag({ asset }: { asset: LibraryAssetView }) {
+  const health = asset.storageHealth;
+  const tone =
+    health === "expired"
+      ? "text-[#c0392b] border-[#c0392b]"
+      : health === "expiring"
+        ? "text-[#d4a853] border-[#d4a853]"
+        : "text-[var(--signal-deep)] border-[var(--signal)]";
+
+  const word =
+    health === "expired"
+      ? "EXPIRED"
+      : health === "expiring"
+        ? "EXPIRING"
+        : "ACTIVE";
+
+  return (
+    <span className={`mono inline-flex border px-2 py-[2px] text-[10px] tracking-[0.16em] ${tone}`}>
+      [ {word} ]
+    </span>
+  );
+}
+
+function shortHash(hash: string) {
+  if (!hash) return "—";
+  const stripped = hash.replace(/^0x/, "");
+  return `${stripped.slice(0, 4)}…${stripped.slice(-4)}`;
+}
+
+function LibraryTable({ assets }: { assets: LibraryAssetView[] }) {
+  return (
+    <div className="mt-8 overflow-x-auto border border-[var(--ink-16)]">
+      <table className="table-mono min-w-[860px]">
+        <thead>
+          <tr>
+            <th>ASSET</th>
+            <th>HASH</th>
+            <th>CATEGORY</th>
+            <th>STATUS</th>
+            <th>STORAGE</th>
+            <th className="text-right">PRICE</th>
+            <th className="text-right">ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          {assets.map((asset) => (
+            <tr key={asset.passId}>
+              <td>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[13px] font-medium text-[var(--ink)]">
+                    {asset.title}
+                  </span>
+                  <span className="text-[11px] tracking-[0.04em] text-[var(--ink-40)]">
+                    {asset.status === "Your Listing" ? "@you · listing" : "@you · owned"}
+                  </span>
+                </div>
+              </td>
+              <td className="text-[12px] tabular-nums text-[var(--ink-60)]">
+                {shortHash(asset.fileHash)}
+              </td>
+              <td className="text-[11px] tracking-[0.12em] text-[var(--ink-60)]">
+                {asset.category.toUpperCase()}
+              </td>
+              <td>
+                <StatusTag asset={asset} />
+              </td>
+              <td className="text-[11px] tracking-[0.04em] text-[var(--ink-60)]">
+                {asset.storageRenewalLabel}
+              </td>
+              <td className="text-right text-[13px] font-medium tabular-nums">
+                {asset.price}
+                <span className="ml-1 text-[10px] text-[var(--ink-40)]">SUI</span>
+              </td>
+              <td className="text-right">
+                <Link
+                  className="mono border-b border-[var(--ink)] pb-[1px] text-[11px] tracking-[0.16em] hover:text-[var(--signal-deep)]"
+                  href={asset.downloadUrl ?? `/marketplace#listing-${asset.listingId}`}
+                >
+                  {asset.action.toUpperCase()}
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EmptyBlock({
+  title,
+  body,
+  cta,
+}: {
+  title: string;
+  body: string;
+  cta: React.ReactNode;
+}) {
+  return (
+    <div className="mt-10 border border-dashed border-[var(--ink-40)] p-12 text-center">
+      <div className="mx-auto max-w-2xl">
+        <div className="section-num">EMPTY STATE</div>
+        <h3 className="display mt-3 text-[clamp(24px,3vw,32px)]">{title}</h3>
+        <p className="mono mx-auto mt-4 max-w-[52ch] text-[12px] leading-7 text-[var(--ink-60)]">
+          {body}
+        </p>
+        <div className="mt-8 flex justify-center">{cta}</div>
+      </div>
+    </div>
   );
 }

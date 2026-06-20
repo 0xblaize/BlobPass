@@ -1,8 +1,3 @@
-import {
-  CheckCircle,
-  Database,
-  Wallet,
-} from "lucide-react";
 import { Footer, Header, StackPills } from "@/components/chrome";
 import { UploadWorkflow } from "@/components/upload/UploadWorkflow";
 
@@ -10,37 +5,29 @@ export default function UploadPage() {
   return (
     <>
       <Header active="upload" />
-      <main className="shell py-16">
-        <section className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
+      <main className="shell pb-24 pt-16">
+        <section className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[7fr_5fr]">
           <div>
-            <h1 className="title text-5xl md:text-6xl">
-              List New <span className="text-cyan-300">Asset</span>
+            <div className="section-num mb-3">01 — INTAKE</div>
+            <h1 className="display text-[clamp(36px,5vw,64px)]">
+              List a new
+              <br />
+              <span style={{ color: "var(--signal-deep)" }}>access pass.</span>
             </h1>
-            <p className="mt-4 text-xl text-zinc-400">
-              Three steps. Zero middlemen. Your files, your profit.
+            <p className="mono mt-8 max-w-[52ch] text-[14px] leading-[1.8] text-[var(--ink-60)]">
+              Five sections. Hash → metadata → price → storage → editions.
+              When you sign, the blob lands on Walrus and the pass mints on
+              Sui in one transaction.
             </p>
           </div>
-          <StackPills />
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <div className="ascii-rule w-full" />
+            <div className="section-num">PROTOCOL STACK</div>
+            <StackPills />
+          </div>
         </section>
 
         <UploadWorkflow />
-
-        <section className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-3">
-          {[
-            { icon: Database, title: "Permanent Storage", text: "Walrus ensures files remain available even if centralized servers go down." },
-            { icon: CheckCircle, title: "Sui Verification", text: "Ownership and access rights are transparently managed by the Sui blockchain." },
-            { icon: Wallet, title: "Direct Payments", text: "Sellers receive SUI directly into their wallets after every purchase." },
-          ].map((item) => {
-            const Icon = item.icon;
-            return (
-              <div className="panel rounded-lg p-7" key={item.title}>
-                <Icon className="mb-6 text-cyan-300" size={28} />
-                <h3 className="title text-lg">{item.title}</h3>
-                <p className="mt-4 leading-7 text-zinc-400">{item.text}</p>
-              </div>
-            );
-          })}
-        </section>
       </main>
       <Footer />
     </>

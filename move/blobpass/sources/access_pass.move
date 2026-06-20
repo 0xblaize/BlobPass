@@ -16,6 +16,8 @@ module blobpass::access_pass {
     const ERoyaltyRequired: u64 = 4;
     const ENotListingSeller: u64 = 5;
     const ESupplyCapReached: u64 = 6;
+    const EEditionSoldOut: u64 = 7;
+    const EInvalidEditionSize: u64 = 8;
 
     const MAX_REGISTERED_BLOBS: u64 = 500;
 
@@ -68,6 +70,8 @@ module blobpass::access_pass {
         royalty_bps: u64,
         access_count: u64,
         royalty_paid_mist: u64,
+        total_supply: u64,
+        passes_minted: u64,
     }
 
     public struct BlobObject has key, store {
@@ -104,6 +108,8 @@ module blobpass::access_pass {
         storage_start_epoch: u64,
         storage_end_epoch: u64,
         royalty_bps: u64,
+        total_supply: u64,
+        passes_minted: u64,
     }
 
     public struct AccessPointerMinted has copy, drop {
@@ -269,11 +275,13 @@ module blobpass::access_pass {
         walrus_blob_id: String,
         file_hash: vector<u8>,
         storage_epochs: u64,
+        total_supply: u64,
         price: u64,
         ctx: &mut TxContext
     ) {
         assert!(!table::contains(&registry.hash_index, file_hash), EDuplicateBlobHash);
         assert!(registry.blob_count < MAX_REGISTERED_BLOBS, ESupplyCapReached);
+        assert!(total_supply >= 1, EInvalidEditionSize);
 
         let seller = tx_context::sender(ctx);
         let storage_start_epoch = tx_context::epoch(ctx);
@@ -317,6 +325,8 @@ module blobpass::access_pass {
                 royalty_bps,
                 access_count: 0,
                 royalty_paid_mist: 0,
+                total_supply,
+                passes_minted: 1,
             },
         );
         registry.blob_count = registry.blob_count + 1;
@@ -343,6 +353,8 @@ module blobpass::access_pass {
             storage_start_epoch,
             storage_end_epoch,
             royalty_bps,
+            total_supply,
+            passes_minted: 1,
         });
 
         transfer::public_transfer(
@@ -379,6 +391,7 @@ module blobpass::access_pass {
         assert!(royalty_paid_mist > 0, ERoyaltyRequired);
 
         let record = table::borrow_mut(&mut registry.hash_index, file_hash);
+        assert!(record.passes_minted < record.total_supply, EEditionSoldOut);
         let buyer = tx_context::sender(ctx);
         let pass = mint_registered(
             record.title,
@@ -397,6 +410,7 @@ module blobpass::access_pass {
         let pass_id = object::uid_to_inner(&pass.id);
 
         record.access_count = record.access_count + 1;
+        record.passes_minted = record.passes_minted + 1;
         record.royalty_paid_mist = record.royalty_paid_mist + royalty_paid_mist;
         registry.pointer_count = registry.pointer_count + 1;
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Blocks, Filter, Search, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -33,7 +32,6 @@ export function MarketplaceCatalog({
 
   const filteredListings = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     return initialListings.filter((item) => {
       const categoryMatch = category === "All Files" || item.category === category;
       const searchMatch =
@@ -41,7 +39,6 @@ export function MarketplaceCatalog({
         item.title.toLowerCase().includes(query) ||
         item.description.toLowerCase().includes(query) ||
         item.category.toLowerCase().includes(query);
-
       return categoryMatch && searchMatch;
     });
   }, [category, initialListings, search]);
@@ -57,15 +54,8 @@ export function MarketplaceCatalog({
   function syncUrl(nextSearch: string, nextCategory: string) {
     const params = new URLSearchParams();
     const trimmedSearch = nextSearch.trim();
-
-    if (trimmedSearch) {
-      params.set("q", trimmedSearch);
-    }
-
-    if (nextCategory !== "All Files") {
-      params.set("category", nextCategory);
-    }
-
+    if (trimmedSearch) params.set("q", trimmedSearch);
+    if (nextCategory !== "All Files") params.set("category", nextCategory);
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(nextUrl, { scroll: false });
   }
@@ -92,148 +82,188 @@ export function MarketplaceCatalog({
 
   return (
     <>
-      <section className="grid gap-10 lg:grid-cols-[1fr_420px]">
+      {/* ─────── HEADER: asymmetric 7/5 ─────── */}
+      <section className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[7fr_5fr] lg:gap-16">
         <div>
-          <h1 className="title text-5xl leading-tight md:text-6xl">
-            Discover High-Value <span className="block text-cyan-300">Digital Assets</span>
+          <div className="section-num mb-3">01 — CATALOG</div>
+          <h1 className="display text-[clamp(36px,5vw,64px)]">
+            Browse the
+            <br />
+            <span style={{ color: "var(--signal-deep)" }}>access ledger.</span>
           </h1>
-          <p className="mt-6 max-w-3xl text-xl leading-8 text-zinc-400">
-            Browse verified files stored on Walrus and secured by the Sui ecosystem. Own your
-            data access passes as portable marketplace assets.
+          <p className="mono mt-8 max-w-[52ch] text-[14px] leading-[1.8] text-[var(--ink-60)]">
+            Every listing here is a live Sui pass, backed by a Walrus blob.
+            Buy once — the pass moves to your wallet and the file follows.
           </p>
         </div>
-        <div className="flex items-center">
+        <div className="flex flex-col gap-3">
+          <div className="ascii-rule" />
           <label
-            className="flex h-16 w-full items-center gap-4 rounded-xl border border-white/10 bg-zinc-950 px-6 text-zinc-400"
+            className="mono flex items-baseline gap-3 border-b border-[var(--ink-40)] pb-2 focus-within:border-b-[var(--signal)] focus-within:[border-bottom-width:2px] focus-within:[padding-bottom:calc(0.5rem-1px)]"
             htmlFor="marketplace-search"
           >
-            <Search size={22} />
+            <span className="text-[var(--signal-deep)] text-[14px]">&gt;</span>
             <input
-              className="w-full bg-transparent text-white outline-none placeholder:text-zinc-500"
+              className="w-full bg-transparent text-[15px] outline-none placeholder:text-[var(--ink-40)]"
               id="marketplace-search"
               onBlur={commitSearch}
               onChange={(event) => updateSearch(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  commitSearch();
-                }
+                if (event.key === "Enter") commitSearch();
               }}
-              placeholder="Search files, code, datasets..."
+              placeholder="search title, file, dataset…"
               value={search}
             />
+            <span className="text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+              [ ⏎ ]
+            </span>
           </label>
+          <div className="mono flex justify-between text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+            <span>{filteredListings.length} OF {initialListings.length} LISTINGS</span>
+            <button
+              className="hover:text-[var(--signal-deep)]"
+              onClick={clearFilters}
+              type="button"
+            >
+              [ CLEAR ]
+            </button>
+          </div>
         </div>
       </section>
 
-      <div className="mt-14 flex flex-wrap items-center gap-4" id="catalog">
-        <button
-          className="grid h-11 w-11 place-items-center rounded-full bg-cyan-300/12 text-cyan-300 transition hover:bg-cyan-300/18"
-          onClick={clearFilters}
-          type="button"
-        >
-          <Filter size={20} />
-        </button>
-        {categories.map((item) => {
+      {/* ─────── CATEGORY TABS ─────── */}
+      <div
+        className="mono mt-16 flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-[var(--ink-16)] py-4 text-[12px] tracking-[0.18em]"
+        id="catalog"
+      >
+        <span className="text-[var(--signal-deep)]">&gt;</span>
+        {categories.map((item, i) => {
           const active = category === item;
-
           return (
-            <button
-              className={
-                active
-                  ? "button-primary min-h-11 px-7"
-                  : "button-secondary min-h-11 rounded-full px-7 text-zinc-300"
-              }
-              key={item}
-              onClick={() => updateCategory(item)}
-              type="button"
-            >
-              {item}
-            </button>
+            <div className="flex items-center gap-6" key={item}>
+              {i > 0 && <span className="text-[var(--ink-40)]">·</span>}
+              <button
+                className={
+                  active
+                    ? "text-[var(--ink)] underline decoration-[var(--signal)] decoration-2 underline-offset-[6px]"
+                    : "text-[var(--ink-60)] hover:text-[var(--ink)]"
+                }
+                onClick={() => updateCategory(item)}
+                type="button"
+              >
+                {item.toUpperCase()}
+              </button>
+            </div>
           );
         })}
       </div>
 
+      {/* ─────── TRENDING ─────── */}
       <section className="mt-20 space-y-8" id="trending-highlights">
-        <div className="flex items-center justify-between">
-          <h2 className="title flex items-center gap-3 text-2xl">
-            <TrendingUp className="text-cyan-300" /> Trending Highlights
-          </h2>
-          <a className="font-bold text-cyan-300" href="#latest-discoveries">
-            Jump to Latest
+        <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[8fr_4fr]">
+          <div>
+            <div className="section-num mb-2">02 — TRENDING</div>
+            <h2 className="display text-[clamp(32px,4vw,56px)]">
+              Most-passed this week.
+            </h2>
+          </div>
+          <a
+            className="mono text-[12px] tracking-[0.18em] text-[var(--signal-deep)] hover:underline md:text-right"
+            href="#latest-discoveries"
+          >
+            ↓ JUMP TO LATEST
           </a>
         </div>
         {trendingListings.length > 0 ? (
-          <div className="grid gap-7 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] xl:grid-cols-2">
             {trendingListings.map((item) => (
-              <FeatureListing item={item} key={item.passId} />
+              <div className="bg-[var(--paper)]" key={item.passId}>
+                <FeatureListing item={item} />
+              </div>
             ))}
           </div>
         ) : initialListings.length > 0 ? (
-          <div className="panel rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-            <h3 className="title text-2xl text-white">No listings match your current filters.</h3>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-400">
-              Try another category or clear your search to inspect the live catalog.
-            </p>
-            <div className="mt-8 flex justify-center">
-              <button
-                className="button-primary min-h-12 min-w-[190px] rounded-full"
-                onClick={clearFilters}
-                type="button"
-              >
-                Reset Filters
+          <EmptyState
+            title="No matches for current filters."
+            body="Try another category or clear your search."
+            cta={
+              <button className="button-primary" onClick={clearFilters} type="button">
+                [ RESET FILTERS ]
               </button>
-            </div>
-          </div>
+            }
+          />
         ) : (
-          <div className="panel rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-            <h3 className="title text-2xl text-white">No listings yet.</h3>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-400">
-              This marketplace reflects live BlobPass state only. As soon as a creator uploads a
-              file and lists its access pass, it will appear here.
-            </p>
-            <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-              <Link className="button-primary min-h-12 min-w-[190px] rounded-full" href="/upload">
-                Upload First Asset
-              </Link>
-              <Link className="button-secondary min-h-12 min-w-[190px] rounded-full" href="/">
-                Back to Home
-              </Link>
-            </div>
-          </div>
+          <EmptyState
+            title="No listings yet."
+            body="This page reflects live BlobPass state. As soon as a creator uploads a file and lists its access pass, it surfaces here."
+            cta={
+              <div className="flex flex-wrap gap-3">
+                <Link className="button-primary" href="/upload">
+                  [ UPLOAD FIRST ASSET ]
+                </Link>
+                <Link className="button-secondary" href="/">
+                  [ HOME ]
+                </Link>
+              </div>
+            }
+          />
         )}
       </section>
 
-      <section className="mt-20 space-y-8" id="latest-discoveries">
-        <div className="flex items-center justify-between">
-          <h2 className="title flex items-center gap-3 text-2xl">
-            <Blocks className="text-cyan-300" /> Latest Discoveries
-          </h2>
-          <span className="text-zinc-400">Showing {filteredListings.length} live listings</span>
+      {/* ─────── LATEST ─────── */}
+      <section className="mt-24 space-y-8" id="latest-discoveries">
+        <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[8fr_4fr]">
+          <div>
+            <div className="section-num mb-2">03 — LATEST</div>
+            <h2 className="display text-[clamp(32px,4vw,56px)]">
+              Newly registered.
+            </h2>
+          </div>
+          <span className="mono text-[12px] tracking-[0.18em] text-[var(--ink-40)] md:text-right">
+            SHOWING {filteredListings.length} LIVE LISTINGS
+          </span>
         </div>
         {filteredListings.length > 0 ? (
-          <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredListings.map((item) => (
-              <ListingCard item={item} key={item.passId} />
+              <div className="bg-[var(--paper)]" key={item.passId}>
+                <ListingCard item={item} />
+              </div>
             ))}
           </div>
         ) : initialListings.length > 0 ? (
-          <div className="panel rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-            <h3 className="title text-2xl text-white">Nothing matches that search yet.</h3>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-400">
-              The catalog is live, but your current filters came back empty.
-            </p>
-            <div className="mt-8 flex justify-center">
-              <button
-                className="button-primary min-h-12 min-w-[190px] rounded-full"
-                onClick={clearFilters}
-                type="button"
-              >
-                Clear Search
+          <EmptyState
+            title="Nothing matches that search."
+            body="The catalog is live, but your current filters came back empty."
+            cta={
+              <button className="button-primary" onClick={clearFilters} type="button">
+                [ CLEAR SEARCH ]
               </button>
-            </div>
-          </div>
+            }
+          />
         ) : null}
       </section>
     </>
+  );
+}
+
+function EmptyState({
+  title,
+  body,
+  cta,
+}: {
+  title: string;
+  body: string;
+  cta: React.ReactNode;
+}) {
+  return (
+    <div className="border border-dashed border-[var(--ink-40)] p-12 text-center">
+      <div className="section-num">EMPTY</div>
+      <h3 className="display mt-3 text-[clamp(24px,3vw,36px)]">{title}</h3>
+      <p className="mono mx-auto mt-4 max-w-[56ch] text-[13px] leading-7 text-[var(--ink-60)]">
+        {body}
+      </p>
+      <div className="mt-8 flex justify-center">{cta}</div>
+    </div>
   );
 }

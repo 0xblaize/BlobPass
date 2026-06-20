@@ -22,8 +22,8 @@ const STEPS = [
   {
     num: '01',
     label: 'Store the file',
-    tag: 'WALRUS STORAGE',
-    tagColor: '#00f0ff',
+    tag: '[ WALRUS STORAGE ]',
+    tagColor: '#00c853',
     title: 'Upload.',
     italic: 'Walrus keeps it.',
     body: 'Your file becomes a certified blob across 200+ storage nodes. 2-of-N erasure coded. No server. No AWS.',
@@ -31,7 +31,7 @@ const STEPS = [
     lines: [
       { delay: 0,    text: '$ walrus upload market-data-q2.csv',       color: '#ECEAE4' },
       { delay: 600,  text: '  ↑ uploading 45 MB → publisher node…',    color: '#888880' },
-      { delay: 1200, text: '  ✓ blob certified  —  2-of-N redundancy', color: '#00f0ff' },
+      { delay: 1200, text: '  ✓ blob certified  —  2-of-N redundancy', color: '#00c853' },
       { delay: 1800, text: '  blobId  bAEOPR7xk2Bt6mY8wQ5nS4hJ3iG…',  color: '#D4A853' },
       { delay: 2400, text: '  size    45 MB   epochs  5   nodes  200+',color: '#888880' },
       { delay: 3000, text: '  url     aggregator.walrus-testnet.wa…',  color: '#888880' },
@@ -40,8 +40,8 @@ const STEPS = [
   {
     num: '02',
     label: 'List on Sui',
-    tag: 'ACCESS LEDGER',
-    tagColor: '#4F9FFF',
+    tag: '[ ACCESS LEDGER ]',
+    tagColor: '#fafaf7',
     title: 'Price it.',
     italic: 'Sui holds the lock.',
     body: 'A DataAccessPass is minted and a Listing is published through the custom access_pass package. The blob is registered once in the shared BlobRegistry — buyers receive the pass object as on-chain proof of access.',
@@ -50,18 +50,18 @@ const STEPS = [
       { delay: 0,    text: '$ sui client call \\',                       color: '#ECEAE4' },
       { delay: 0,    text: '    --module access_pass \\',                color: '#888880' },
       { delay: 0,    text: '    --function create_registered_listing',   color: '#888880' },
-      { delay: 600,  text: '  ✓ DataAccessPass minted',                  color: '#00f0ff' },
+      { delay: 600,  text: '  ✓ DataAccessPass minted',                  color: '#00c853' },
       { delay: 1200, text: '  passId     0x9f2e8d1c3a5b7e4f62a1b9…',    color: '#D4A853' },
       { delay: 1800, text: '  seller     0x4a21…9e3f',                  color: '#888880' },
       { delay: 2400, text: '  price      15 SUI',                        color: '#888880' },
-      { delay: 3000, text: '  ✓ registry indexed  →  Listing shared',   color: '#00f0ff' },
+      { delay: 3000, text: '  ✓ registry indexed  →  Listing shared',   color: '#00c853' },
     ],
   },
   {
     num: '03',
     label: 'Buyer gets access',
-    tag: 'TATUM RPC',
-    tagColor: '#D4A853',
+    tag: '[ TATUM RPC ]',
+    tagColor: '#fafaf7',
     title: 'Pay once.',
     italic: 'Tatum confirms it.',
     body: "Buyer pays. Tatum's Sui RPC verifies the DataAccessPass transfer. Access granted. File retrieved from Walrus. Done.",
@@ -70,10 +70,10 @@ const STEPS = [
       { delay: 0,    text: '$ tatum sui getObject 0x9f2e8d1c3a5b…',    color: '#ECEAE4' },
       { delay: 600,  text: '  objectId   0x9f2e8d1c3a5b7e4f62a1b9…',   color: '#888880' },
       { delay: 1200, text: '  owner      0x4a21…9e3f  ← buyer wallet', color: '#D4A853' },
-      { delay: 1800, text: '  ✓ ownership verified  —  access granted',color: '#00f0ff' },
+      { delay: 1800, text: '  ✓ ownership verified  —  access granted',color: '#00c853' },
       { delay: 2400, text: '$ walrus download bAEOPR7xk2Bt6mY8wQ5…',   color: '#ECEAE4' },
       { delay: 3000, text: '  ↓ fetching from aggregator…',             color: '#888880' },
-      { delay: 3600, text: '  ✓ market-data-q2.csv  →  ./downloads/', color: '#00f0ff' },
+      { delay: 3600, text: '  ✓ market-data-q2.csv  →  ./downloads/', color: '#00c853' },
     ],
   },
 ];
@@ -137,42 +137,37 @@ function TerminalWindow({ step, active }: { step: typeof STEPS[0]; active: boole
       style={{
         flex: 1,
         background: '#0a0c0e',
-        border: `1px solid ${active ? step.tagColor + '40' : 'rgba(255,255,255,0.07)'}`,
-        borderTop: `2px solid ${active ? step.tagColor : 'transparent'}`,
-        borderRadius: 10,
+        border: `1px solid ${active ? 'var(--signal)' : 'rgba(250,247,240,0.12)'}`,
+        borderTop: `2px solid ${active ? 'var(--signal)' : 'rgba(250,247,240,0.12)'}`,
+        borderRadius: 0,
         overflow: 'hidden',
-        fontFamily: "'Space Mono', monospace",
+        fontFamily: 'var(--font-mono)',
         transition: 'border-color 0.3s',
       }}
     >
-      {/* window chrome */}
+      {/* window chrome — brutalist: no traffic lights, hairline divider */}
       <div style={{
         padding: '9px 14px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(250,247,240,0.10)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        fontFamily: 'var(--font-mono)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {['#C0392B', '#D4A853', '#2A9460'].map(c => (
-            <div key={c} style={{
-              width: 9, height: 9, borderRadius: '50%',
-              background: c, opacity: active ? 0.9 : 0.35,
-            }} />
-          ))}
-          <span style={{ fontSize: 10, color: '#666660', marginLeft: 6, letterSpacing: '0.06em' }}>
-            {step.filename}
-          </span>
-        </div>
+        <span style={{
+          fontSize: 10,
+          color: active ? '#ECEAE4' : '#666660',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+        }}>
+          {step.filename}
+        </span>
         <span style={{
           fontSize: 9,
-          letterSpacing: '0.12em',
-          color: active ? step.tagColor : '#333330',
-          border: `1px solid ${active ? step.tagColor + '50' : '#333330'}`,
-          borderRadius: 4,
-          padding: '2px 7px',
-          transition: 'all 0.3s',
-          fontFamily: "'Space Mono', monospace",
+          letterSpacing: '0.16em',
+          color: active ? 'var(--signal)' : '#333330',
+          transition: 'color 0.3s',
+          fontFamily: 'var(--font-mono)',
         }}>
           {step.tag}
         </span>
@@ -238,14 +233,18 @@ export function TerminalSection() {
         className="shell py-28 space-y-8"
       >
         {/* heading */}
-        <div>
-          <span className="chip mb-4 text-[10px] px-3 py-1 font-bold tracking-wider">
-            HOW IT WORKS
-          </span>
-          <h2 className="title text-[clamp(28px,4vw,48px)] leading-tight mt-3">
-            Three steps.<br />
-            <span className="text-cyan-300">Zero middlemen.</span>
-          </h2>
+        <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-[8fr_4fr]">
+          <div>
+            <div className="section-num mb-3" style={{ color: 'rgba(250,247,240,0.4)' }}>02 — RUNTIME</div>
+            <h2 className="display text-[clamp(40px,6vw,80px)]" style={{ color: 'var(--paper)' }}>
+              Three steps.<br />
+              <span style={{ color: 'var(--signal)' }}>Zero middlemen.</span>
+            </h2>
+          </div>
+          <p className="mono max-w-[40ch] text-[13px] leading-7" style={{ color: 'var(--paper-60)' }}>
+            Watch the protocol speak. Each tab is a real CLI transcript — what
+            actually runs when a file is uploaded, listed, and unlocked.
+          </p>
         </div>
 
         {/* step tab pills */}
@@ -260,14 +259,14 @@ export function TerminalSection() {
               onClick={() => handleSelect(i)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
-                background: active === i ? 'rgba(0,240,255,0.06)' : 'transparent',
-                border: `1px solid ${active === i ? s.tagColor + '55' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 8, padding: '6px 13px', cursor: 'pointer',
-                fontFamily: "'Space Mono', monospace", transition: 'all 0.2s',
+                background: 'transparent',
+                border: `1px solid ${active === i ? 'var(--signal)' : 'rgba(250,247,240,0.16)'}`,
+                borderRadius: 0, padding: '6px 13px', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', transition: 'all 0.2s',
               }}
             >
-              <span style={{ fontSize: 10, color: active === i ? s.tagColor : '#444440' }}>{s.num}</span>
-              <span style={{ fontSize: 11, color: active === i ? '#ECEAE4' : '#555550', whiteSpace: 'nowrap' }}>{s.label}</span>
+              <span style={{ fontSize: 10, color: active === i ? 'var(--signal)' : '#444440', letterSpacing: '0.12em' }}>{s.num}</span>
+              <span style={{ fontSize: 11, color: active === i ? '#ECEAE4' : '#555550', whiteSpace: 'nowrap', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{s.label}</span>
             </button>
           ))}
         </div>
@@ -302,17 +301,18 @@ export function TerminalSection() {
                 onClick={() => handleSelect(i)}
                 aria-label={`Go to step ${i + 1}: ${s.label}`}
                 style={{
-                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-                  background: active === i ? s.tagColor : '#333330',
-                  transition: 'background 0.3s',
-                  border: 'none', padding: 0,
+                  width: 8, height: 8, borderRadius: 0, flexShrink: 0, cursor: 'pointer',
+                  background: active === i ? 'var(--signal)' : 'transparent',
+                  border: `1px solid ${active === i ? 'var(--signal)' : '#444440'}`,
+                  transition: 'all 0.3s',
+                  padding: 0,
                 }}
               />
               {i < 2 && (
                 <div style={{ flex: 1, height: 1, background: '#333330', position: 'relative', overflow: 'hidden' }}>
                   <div style={{
                     position: 'absolute', inset: 0,
-                    background: STEPS[i].tagColor,
+                    background: 'var(--signal)',
                     transform: active > i ? 'scaleX(1)' : 'scaleX(0)',
                     transformOrigin: 'left',
                     transition: 'transform 0.5s cubic-bezier(0.22,1,0.36,1)',
@@ -322,9 +322,10 @@ export function TerminalSection() {
             </div>
           ))}
           <span style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 10, color: '#555550',
-            marginLeft: 10, whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10, color: '#888880',
+            letterSpacing: '0.16em', textTransform: 'uppercase',
+            marginLeft: 12, whiteSpace: 'nowrap',
           }}>
             {STEPS[active].label}
           </span>
@@ -345,33 +346,35 @@ export function TerminalSection() {
                 padding: isMobile && active !== i ? 0 : '1rem',
                 maxHeight: isMobile && active !== i ? 0 : 200,
                 overflow: 'hidden',
-                borderRadius: 10,
-                background: active === i ? 'rgba(255,255,255,0.03)' : 'transparent',
-                border: `1px solid ${active === i ? s.tagColor + '25' : 'transparent'}`,
+                borderRadius: 0,
+                background: 'transparent',
+                borderTop: `1px solid ${active === i ? 'var(--signal)' : 'rgba(250,247,240,0.10)'}`,
                 transition: 'all 0.35s',
-                opacity: active === i ? 1 : isMobile ? 0 : 0.28,
+                opacity: active === i ? 1 : isMobile ? 0 : 0.32,
               }}
             >
               {(!isMobile || active === i) && (
                 <>
                   <div style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: 11, color: s.tagColor,
-                    letterSpacing: '0.1em', marginBottom: '0.4rem', fontWeight: 500,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10, color: active === i ? 'var(--signal)' : '#888880',
+                    letterSpacing: '0.16em', marginBottom: '0.6rem', fontWeight: 500,
+                    textTransform: 'uppercase',
                   }}>
-                    {s.num} — {s.tag}
+                    {s.num} · {s.tag}
                   </div>
                   <div style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: isMobile ? 18 : 16,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: isMobile ? 16 : 14,
                     fontWeight: 700, color: '#ECEAE4',
-                    lineHeight: 1.3, marginBottom: '0.4rem',
+                    lineHeight: 1.4, marginBottom: '0.4rem',
+                    letterSpacing: '0.01em',
                   }}>
-                    {s.title} <em style={{ color: s.tagColor, fontStyle: 'italic' }}>{s.italic}</em>
+                    {s.title} <span style={{ color: 'var(--signal)' }}>{s.italic}</span>
                   </div>
                   <div style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: 12, color: '#AAAAAA', lineHeight: 1.7,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12, color: '#AAAAAA', lineHeight: 1.75,
                   }}>
                     {s.body}
                   </div>

@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { loadChainPasses } from "./chain-index";
 import { DEMO_SELLER_ADDRESS, normalizeAddress, sanitizeFilename, slugify } from "./format";
 import type {
   BlobPassRuntimeSource,
@@ -28,6 +29,8 @@ type CreateRegistryListingInput = {
   storageEpochDurationDays?: number;
   originalUploader?: string;
   royaltyBps?: number;
+  totalSupply?: number;
+  passesMinted?: number;
   fields: DataAccessPassFields;
 };
 
@@ -102,6 +105,11 @@ function normalizePassRecord(pass: DataAccessPassObject): DataAccessPassObject {
     pass.storageEpochDurationDays,
     getEpochDurationDays(),
   );
+  const totalSupply = Math.max(1, numberOrDefault(pass.totalSupply, 1));
+  const passesMinted = Math.max(
+    1,
+    numberOrDefault(pass.passesMinted, Math.max(1, Number.isFinite(pass.purchases) ? Number(pass.purchases) + 1 : 1)),
+  );
 
   return {
     ...pass,
@@ -136,6 +144,8 @@ function normalizePassRecord(pass: DataAccessPassObject): DataAccessPassObject {
     pointer: Boolean(pass.pointer),
     duplicateOfPassId: pass.duplicateOfPassId || "",
     lastStorageTopUpDigest: pass.lastStorageTopUpDigest || "",
+    totalSupply,
+    passesMinted,
     content: {
       fields: {
         ...pass.content.fields,
@@ -197,6 +207,43 @@ function matchesAddress(left: string, right: string) {
   return normalizeAddress(left) === normalizeAddress(right);
 }
 
+function mergeByPassId(local: DataAccessPassObject[], chain: DataAccessPassObject[]) {
+  const byId = new Map<string, DataAccessPassObject>();
+  for (const pass of chain) {
+    byId.set(pass.id, pass);
+  }
+  for (const pass of local) {
+    const chainEntry = byId.get(pass.id);
+    if (chainEntry) {
+      // Chain is the source of truth for listed/owner/passesMinted/totalSupply.
+      // Local overlay carries display niceties (gradient, assetFilename) and the
+      // user's chosen seller display string, but doesn't override chain state.
+      byId.set(pass.id, {
+        ...pass,
+        listed: chainEntry.listed,
+        owner: chainEntry.owner,
+        purchases: Math.max(pass.purchases, chainEntry.purchases),
+        passesMinted: Math.max(pass.passesMinted ?? 1, chainEntry.passesMinted ?? 1),
+        totalSupply: Math.max(pass.totalSupply ?? 1, chainEntry.totalSupply ?? 1),
+        storageEndEpoch: Math.max(pass.storageEndEpoch ?? 0, chainEntry.storageEndEpoch ?? 0),
+        storageTopUps: Math.max(pass.storageTopUps ?? 0, chainEntry.storageTopUps ?? 0),
+        lastTransactionDigest: pass.lastTransactionDigest || chainEntry.lastTransactionDigest,
+        lastStorageTopUpDigest: pass.lastStorageTopUpDigest || chainEntry.lastStorageTopUpDigest,
+      });
+    } else {
+      byId.set(pass.id, pass);
+    }
+  }
+  return Array.from(byId.values()).sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+async function mergedPasses(): Promise<DataAccessPassObject[]> {
+  const [registry, chainPasses] = await Promise.all([readRegistry(), loadChainPasses()]);
+  return mergeByPassId(registry.passes, chainPasses);
+}
+
 function gradientFor(index: number) {
   return DEFAULT_GRADIENTS[index % DEFAULT_GRADIENTS.length];
 }
@@ -206,42 +253,40 @@ function registrySourceFor(storageSource: Extract<BlobPassRuntimeSource, "local"
 }
 
 export async function listRegistryMarketplacePasses() {
-  const registry = await readRegistry();
+  const passes = await mergedPasses();
 
-  return registry.passes
+  return passes
     .filter((pass) => pass.listed)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .map(clonePass);
 }
 
 export async function listRegistryInventory(address: string) {
-  const registry = await readRegistry();
+  const passes = await mergedPasses();
 
-  return registry.passes
+  return passes
     .filter((pass) => {
       const listedByUser = pass.listed && matchesAddress(pass.seller, address);
       const ownedByUser = matchesAddress(pass.owner, address);
       return listedByUser || ownedByUser;
     })
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .map(clonePass);
 }
 
 export async function getRegistryPass(passId: string) {
-  const registry = await readRegistry();
-  const pass = registry.passes.find((item) => item.id === passId);
+  const passes = await mergedPasses();
+  const pass = passes.find((item) => item.id === passId);
   return pass ? clonePass(pass) : null;
 }
 
 export async function getRegistryPassByListingId(listingId: string) {
-  const registry = await readRegistry();
-  const pass = registry.passes.find((item) => item.listingId === listingId);
+  const passes = await mergedPasses();
+  const pass = passes.find((item) => item.listingId === listingId);
   return pass ? clonePass(pass) : null;
 }
 
 export async function findRegistryPassByBlobId(blobId: string) {
-  const registry = await readRegistry();
-  const pass = registry.passes.find((item) => item.content.fields.walrus_blob_id === blobId);
+  const passes = await mergedPasses();
+  const pass = passes.find((item) => item.content.fields.walrus_blob_id === blobId);
   return pass ? clonePass(pass) : null;
 }
 
@@ -252,8 +297,8 @@ export async function findRegistryPassByFileHash(fileHash: string) {
     return null;
   }
 
-  const registry = await readRegistry();
-  const pass = registry.passes.find((item) => item.fileHash.toLowerCase() === normalizedHash);
+  const passes = await mergedPasses();
+  const pass = passes.find((item) => item.fileHash.toLowerCase() === normalizedHash);
   return pass ? clonePass(pass) : null;
 }
 
@@ -300,6 +345,8 @@ export async function createRegistryListing(input: CreateRegistryListingInput) {
       storageTopUps: 0,
       storageRoyaltyMist: "0",
       pointer: false,
+      totalSupply: Math.max(1, input.totalSupply ?? 1),
+      passesMinted: Math.max(1, input.passesMinted ?? 1),
       content: {
         fields: {
           ...input.fields,
@@ -359,6 +406,8 @@ export async function indexRegistryListing(input: IndexRegistryListingInput) {
       duplicateOfPassId: existing?.duplicateOfPassId,
       lastTransactionDigest: input.transactionDigest || existing?.lastTransactionDigest,
       lastStorageTopUpDigest: existing?.lastStorageTopUpDigest,
+      totalSupply: Math.max(1, input.totalSupply ?? existing?.totalSupply ?? 1),
+      passesMinted: Math.max(1, input.passesMinted ?? existing?.passesMinted ?? 1),
       content: {
         fields: {
           ...input.fields,
@@ -504,6 +553,7 @@ export async function mintRegistryAccessPointer({
     });
 
     original.purchases += 1;
+    original.passesMinted = Math.min(original.totalSupply, (original.passesMinted || 1) + 1);
     original.storageRoyaltyMist = (
       BigInt(original.storageRoyaltyMist || "0") + BigInt(royaltyMist || "0")
     ).toString();
@@ -543,9 +593,9 @@ export async function extendRegistryStorage({
 }
 
 export async function getRegistrySellerEarnings(address: string) {
-  const registry = await readRegistry();
+  const passes = await mergedPasses();
 
-  return registry.passes.reduce((total, pass) => {
+  return passes.reduce((total, pass) => {
     if (!matchesAddress(pass.seller, address) || pass.purchases < 1) {
       return total;
     }

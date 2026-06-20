@@ -38,6 +38,8 @@ type CreatePassInput = {
   storageEpochDurationDays?: number;
   originalUploader?: string;
   royaltyBps?: number;
+  totalSupply?: number;
+  passesMinted?: number;
   fields: DataAccessPassFields;
 };
 
@@ -104,6 +106,9 @@ function getTatumRpcUrl() {
 function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceListing {
   const fields = pass.content.fields;
   const storageDaysRemaining = getStorageDaysRemaining(pass);
+  const editionTotal = Math.max(1, pass.totalSupply ?? 1);
+  const editionsMinted = Math.min(editionTotal, Math.max(1, pass.passesMinted ?? 1));
+  const editionsRemaining = Math.max(0, editionTotal - editionsMinted);
 
   return {
     id: pass.listingId,
@@ -132,6 +137,10 @@ function mapPassToMarketplaceListing(pass: DataAccessPassObject): MarketplaceLis
     storageHealth: getStorageHealth(storageDaysRemaining),
     royaltyBps: pass.royaltyBps,
     verified: isVerifiedCreator(pass.originalUploader) || isVerifiedCreator(pass.seller),
+    editionTotal,
+    editionsMinted,
+    editionsRemaining,
+    soldOut: editionsRemaining <= 0,
   };
 }
 
@@ -173,6 +182,17 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
         : "Storage window expired",
     royaltyBps: pass.royaltyBps,
     verified: isVerifiedCreator(pass.originalUploader) || isVerifiedCreator(pass.seller),
+    editionTotal: Math.max(1, pass.totalSupply ?? 1),
+    editionsMinted: Math.min(
+      Math.max(1, pass.totalSupply ?? 1),
+      Math.max(1, pass.passesMinted ?? 1),
+    ),
+    editionsRemaining: Math.max(
+      0,
+      Math.max(1, pass.totalSupply ?? 1) - Math.max(1, pass.passesMinted ?? 1),
+    ),
+    soldOut:
+      Math.max(1, pass.passesMinted ?? 1) >= Math.max(1, pass.totalSupply ?? 1),
   };
 }
 

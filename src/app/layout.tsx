@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Space_Mono, Work_Sans } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import "@mysten/dapp-kit/dist/index.css";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
@@ -7,16 +8,17 @@ import "./globals.css";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://blob-pass.vercel.app";
 const ogImageUrl = new URL("/opengraph-image", siteUrl).toString();
 
-const workSans = Work_Sans({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-sans",
+  weight: ["400", "500", "700"],
+  variable: "--font-mono-jbm",
   display: "swap",
 });
 
-const spaceMono = Space_Mono({
+const geistDisplay = Geist({
   subsets: ["latin"],
   weight: ["400", "700"],
-  variable: "--font-mono",
+  variable: "--font-display-geist",
   display: "swap",
 });
 
@@ -55,11 +57,9 @@ export const metadata: Metadata = {
     description: "Sell digital files stored on Walrus with native Sui access passes.",
     images: [ogImageUrl],
   },
-  icons: {
-    icon: "/favicon.jpg",
-    shortcut: "/favicon.jpg",
-    apple: "/logo.jpg",
-  },
+  // Icons are auto-wired by Next.js from src/app/icon.tsx (favicon)
+  // and src/app/apple-icon.tsx (apple touch icon) — both code-generated
+  // to match the site's brutalist design system. No manual config needed.
 };
 
 export default function RootLayout({
@@ -68,7 +68,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${workSans.variable} ${spaceMono.variable}`}>
+    <html lang="en" className={`${jetbrainsMono.variable} ${geistDisplay.variable}`}>
       <body className="antialiased">
         <Providers>{children}</Providers>
       </body>

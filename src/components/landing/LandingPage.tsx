@@ -1,12 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  CheckCircle,
-  Database,
-  ShieldCheck,
-  Upload,
-  Zap,
-} from "lucide-react";
+import { Suspense } from "react";
 import { ListingCard } from "@/components/cards";
 import { Footer, Header, StackPills } from "@/components/chrome";
 import { getMarketplaceListings } from "@/lib/blobpass/ledger";
@@ -14,247 +7,436 @@ import { AccessControlSection } from "./AccessControlSection";
 import { RabbitScene } from "./RabbitScene";
 import { TerminalSection } from "./TerminalSection";
 
-export async function LandingPage() {
-  const listings = await getMarketplaceListings();
+export function LandingPage() {
+  const buildTs = new Date().toISOString().replace("T", " · ").slice(0, 19);
 
   return (
-    <div className="font-mono">
-      <div className="relative min-h-screen overflow-hidden bg-black">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.98)_0%,rgba(0,0,0,0.96)_46%,rgba(0,22,20,0.82)_100%)]" />
+    <div>
+      {/* ──────────────── HERO (ink zone) ──────────────── */}
+      <div className="zone-ink relative overflow-hidden">
         <Header landing />
-        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[1280px] items-center px-4">
-          <section className="grid w-full grid-cols-1 items-center justify-center gap-7 py-10 lg:grid-cols-[minmax(300px,390px)_56px_minmax(440px,580px)] lg:gap-9">
-            <div className="relative flex min-h-[350px] items-center justify-center lg:min-h-[540px]">
-              <RabbitScene className="h-[350px] w-full max-w-[300px] cursor-grab touch-none bg-transparent active:cursor-grabbing lg:h-[540px] lg:max-w-[390px] [&_canvas]:block [&_canvas]:h-full [&_canvas]:w-full" />
-            </div>
+        <main className="shell relative">
+          <section className="flex flex-col items-stretch gap-10 pb-24 pt-16 md:flex-row md:items-center md:gap-12 md:pb-32 md:pt-24">
+            {/* LEFT: typographic mass (≈ 7/12) */}
+            <div className="min-w-0 md:basis-[58%]">
+              <div className="mb-8 flex items-center gap-3">
+                <span className="tag tag-signal">[ MAINNET-READY ]</span>
+                <span className="ascii-rule hidden flex-1 md:block" />
+              </div>
 
-            <div className="hidden h-3.5 w-13 border-y-[3px] border-b-cyan-300/15 border-t-cyan-300/30 lg:block" />
-
-            <div className="mx-auto max-w-[620px] text-center lg:mx-0 lg:text-left lg:translate-x-[15%]">
-              <span className="inline-flex min-w-40 items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/6 px-5 py-2 text-xs font-extrabold text-cyan-300">
-                Ecosystem First
-              </span>
-              <h1 className="mt-5 text-[clamp(40px,9vw,72px)] font-black leading-[0.98] text-white lg:text-[clamp(48px,5.4vw,72px)]">
-                Sell Digital
+              <h1
+                className="display text-[clamp(40px,6vw,80px)]"
+                style={{ color: "var(--paper)" }}
+              >
+                Files,
                 <br />
-                Files Stored
+                <span style={{ color: "var(--signal)" }}>certified.</span>
                 <br />
-                on <span className="text-cyan-300">Walrus</span>
+                Access,
+                <br />
+                <span className="italic" style={{ fontWeight: 400 }}>
+                  permanent.
+                </span>
               </h1>
-              <p className="mt-5 max-w-[590px] text-lg leading-snug text-zinc-400 lg:text-xl">
-                The first premium marketplace for the Sui ecosystem. Monetize your code,
-                designs, and data with durable, decentralized storage.
+
+              <p className="mono mt-10 max-w-[44ch] text-[14px] leading-[1.75] text-[var(--paper-60)]">
+                BlobPass is the access ledger for files stored on Walrus. Mint a
+                Sui pass, list it, and the buyer carries proof of ownership in
+                their wallet — forever.
               </p>
-              <div className="mt-12 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
-                <Link
-                  className="inline-flex min-h-14 min-w-[190px] items-center justify-center gap-3 rounded-full border border-cyan-300/70 bg-cyan-300 px-9 text-base font-extrabold text-black shadow-[0_0_36px_rgba(34,211,238,0.18)] transition hover:translate-y-[-1px] hover:border-cyan-200 hover:bg-cyan-200"
-                  href="/marketplace"
-                >
-                  <ArrowRight size={18} /> Marketplace
+
+              <div className="mt-12 flex flex-wrap gap-3">
+                <Link className="button-primary" href="/marketplace">
+                  [ MARKETPLACE ]
                 </Link>
-                <Link
-                  className="inline-flex min-h-14 min-w-[190px] items-center justify-center gap-3 rounded-full border border-cyan-300/40 bg-black/55 px-9 text-base font-extrabold text-white transition hover:translate-y-[-1px] hover:border-cyan-200 hover:text-cyan-200"
-                  href="/upload"
-                >
-                  <Upload size={18} /> Upload File
+                <Link className="button-secondary" href="/upload">
+                  [ UPLOAD A FILE ]
                 </Link>
               </div>
-              <div className="mt-16 flex flex-wrap justify-center gap-7 border-t border-white/10 pt-5 text-xs font-extrabold uppercase tracking-[0.16em] text-zinc-400 lg:justify-start">
-                <span className="inline-flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-cyan-300/12 text-cyan-300">
-                    <Zap size={16} />
-                  </span>
-                  Powered by Walrus
-                </span>
+
+              {/* Meta strip */}
+              <div className="mt-16 grid grid-cols-2 gap-x-8 gap-y-3 border-t border-[var(--paper-16)] pt-6 md:grid-cols-4">
+                <Meta k="CHAIN" v="SUI · TESTNET" />
+                <Meta k="STORAGE" v="WALRUS" />
+                <Meta k="VERIFY" v="TATUM RPC" />
+                <Meta k="BUILD" v={buildTs.slice(0, 10)} />
+              </div>
+            </div>
+
+            {/* RIGHT: rabbit crate (≈ 5/12) */}
+            <div className="flex w-full min-w-0 justify-center md:basis-[42%] md:justify-end">
+              <div className="relative w-full" style={{ maxWidth: 560, minWidth: 0 }}>
+                {/* top legend */}
+                <div
+                  className="mono mb-3 flex items-center justify-between"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.18em",
+                    color: "rgba(250,247,240,0.5)",
+                  }}
+                >
+                  <span style={{ color: "var(--signal)" }}>● LIVE</span>
+                  <span>SUBJECT · RABBIT.GLB</span>
+                  <span>CAM-01</span>
+                </div>
+
+                {/* the crate */}
+                <div
+                  className="relative w-full"
+                  style={{
+                    aspectRatio: "1 / 1",
+                    minHeight: 380,
+                    backgroundColor: "#06080a",
+                    border: "1px solid rgba(250,247,240,0.55)",
+                    boxShadow:
+                      "inset 0 0 0 1px rgba(0,200,83,0.06), inset 0 0 80px rgba(0,200,83,0.10)",
+                  }}
+                >
+                  {/* placeholder — visible until GLB loads */}
+                  <div
+                    className="pointer-events-none absolute inset-0 grid place-items-center"
+                    style={{ zIndex: 0 }}
+                  >
+                    <div className="text-center">
+                      <div
+                        className="mono"
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.22em",
+                          color: "rgba(250,247,240,0.55)",
+                        }}
+                      >
+                        LOADING · RABBIT.GLB
+                      </div>
+                      <div
+                        className="mono mt-2"
+                        style={{
+                          fontSize: 9,
+                          letterSpacing: "0.18em",
+                          color: "var(--signal)",
+                        }}
+                      >
+                        4.0 MB · GLTF 2.0
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Three.js canvas */}
+                  <RabbitScene
+                    className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing [&_canvas]:block [&_canvas]:h-full [&_canvas]:w-full"
+                  />
+
+                  <CornerMark className="left-2 top-2" />
+                  <CornerMark className="right-2 top-2 rotate-90" />
+                  <CornerMark className="bottom-2 right-2 rotate-180" />
+                  <CornerMark className="bottom-2 left-2 -rotate-90" />
+                </div>
+
+                {/* bottom legend */}
+                <div
+                  className="mono mt-3 flex justify-between"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.18em",
+                    color: "rgba(250,247,240,0.5)",
+                  }}
+                >
+                  <span>HOVER · ROTATE</span>
+                  <span>DRAG · ORBIT</span>
+                </div>
               </div>
             </div>
           </section>
         </main>
       </div>
 
-      <hr className="border-white/10 opacity-30" />
-
-      <main>
-        <div className="border-b border-white/10">
+      {/* ──────────────── HOW IT WORKS / ACCESS CONTROL ──────────────── */}
+      <main className="zone-paper">
+        <div className="border-b border-[var(--ink-16)]">
           <AccessControlSection />
         </div>
 
-        <div className="border-y border-white/10" id="how">
+        {/* Terminal section keeps its dark visual identity (it's a terminal) */}
+        <div className="zone-ink relative border-y border-[var(--paper-16)]" id="how">
           <TerminalSection />
         </div>
 
-        <section className="shell space-y-10 py-32" id="marketplace-preview">
-          <div className="flex items-end justify-between gap-4">
+        {/* ──────────────── MARKETPLACE PREVIEW ──────────────── */}
+        <section
+          className="shell py-32"
+          id="marketplace-preview"
+        >
+          <div className="mb-16 grid grid-cols-1 items-end gap-8 md:grid-cols-[8fr_4fr]">
             <div>
-              <span className="chip mb-4 px-3 py-1 text-[10px] font-bold tracking-wider">
-                TRENDING NOW
-              </span>
-              <h2 className="title text-[22px] uppercase tracking-widest">Marketplace Preview</h2>
+              <div className="section-num mb-2">02 — TRADE</div>
+              <h2 className="display text-[clamp(40px,6vw,80px)]">
+                What&apos;s live
+                <br />
+                right now.
+              </h2>
             </div>
-            <Link
-              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-cyan-300"
-              href="/marketplace"
-            >
-              Browse All Listings <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {listings.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              {listings.slice(0, 4).map((item) => (
-                <ListingCard item={item} key={item.passId} />
-              ))}
-            </div>
-          ) : (
-            <div className="panel rounded-[28px] border border-dashed border-cyan-300/25 px-8 py-14 text-center">
-              <div className="mx-auto max-w-2xl">
-                <h3 className="title text-2xl text-white">Marketplace opens with the first live listing.</h3>
-                <p className="mt-4 text-sm leading-7 text-zinc-400">
-                  Upload a file, register the access pass, and your Walrus-backed asset will appear
-                  here without any seeded placeholder cards.
-                </p>
-                <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-                  <Link className="button-primary min-h-12 min-w-[190px] rounded-full" href="/marketplace">
-                    <ArrowRight size={18} /> Marketplace
-                  </Link>
-                  <Link className="button-secondary min-h-12 min-w-[190px] rounded-full" href="/upload">
-                    <Upload size={18} /> Upload File
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="shell grid gap-8 py-10 md:grid-cols-2" id="stack">
-          <div className="panel rounded-3xl p-12">
-            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl border border-cyan-900/50 bg-cyan-950/30 text-cyan-400">
-              <Zap size={18} />
-            </div>
-            <h2 className="title text-3xl leading-snug">
-              Your knowledge.
-              <br />
-              <span className="text-cyan-300">Your price.</span>
-            </h2>
-            <ul className="mt-12 space-y-8">
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Upload once</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    Any file format from PDFs to ZIP archives and MP4 releases.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Get your price in SUI</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    You keep 100% of every sale, instantly.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Your file stays yours</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    The blob stays on Walrus while you control the access listing.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Earnings on-chain</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    Direct wallet settlement with zero intermediaries.
-                  </div>
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          <div className="panel rounded-3xl p-12">
-            <div className="mb-10 grid h-10 w-10 place-items-center rounded-xl border border-cyan-900/50 bg-cyan-950/30 text-cyan-400">
-              <ShieldCheck size={18} />
-            </div>
-            <h2 className="title text-3xl leading-snug">
-              Pay once.
-              <br />
-              <span className="text-cyan-300">Own forever.</span>
-            </h2>
-            <ul className="mt-12 space-y-8">
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">No subscriptions</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    One transaction, and the access pass is yours permanently.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Verified ownership</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    BlobPass checks ownership before every protected download.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Instant access</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    Protected blobs stream directly to the buyer after verification passes.
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <CheckCircle className="mt-1 shrink-0 text-cyan-400" size={16} />
-                <div>
-                  <div className="text-[13px] font-bold text-white">Works with any Sui wallet</div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                    Sui Wallet, Surf, Ethos, and other Wallet Standard apps can connect directly.
-                  </div>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="shell py-32" id="for">
-          <div className="panel relative mx-auto max-w-[900px] overflow-hidden rounded-[40px] p-20 text-center">
-            <div className="pointer-events-none absolute left-1/2 top-0 h-[300px] w-[600px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[100px]" />
-            <div className="relative z-10 mx-auto mb-10 grid h-16 w-16 place-items-center rounded-2xl bg-cyan-300 text-black">
-              <Database size={28} />
-            </div>
-            <h2 className="title relative z-10 mx-auto max-w-[640px] text-[32px] uppercase tracking-widest leading-snug">
-              Start Selling Files on Walrus Today
-            </h2>
-            <p className="relative z-10 mx-auto mt-6 max-w-lg text-[11px] uppercase tracking-widest leading-6 text-zinc-500">
-              Join the growing ecosystem of creators and builders monetizing their digital assets
-              on the world&apos;s first decentralized file marketplace.
-            </p>
-            <div className="relative z-10 mt-14 flex flex-wrap justify-center gap-6">
-              <Link className="button-primary min-w-[220px]" href="/marketplace">
-                Explore Marketplace
-              </Link>
-              <Link className="button-secondary min-w-[220px]" href="/upload">
-                Upload My First File
+            <div className="flex md:justify-end">
+              <Link
+                className="mono inline-flex items-center gap-2 border-b border-[var(--ink)] pb-1 text-[12px] tracking-[0.18em] hover:text-[var(--signal-deep)]"
+                href="/marketplace"
+              >
+                BROWSE ALL LISTINGS
               </Link>
             </div>
-            <div className="relative z-10 mt-16 flex justify-center opacity-40 grayscale">
-              <StackPills />
-            </div>
+          </div>
+
+          <Suspense fallback={<MarketplacePreviewSkeleton />}>
+            <MarketplacePreview />
+          </Suspense>
+        </section>
+
+        {/* ──────────────── DUAL VALUE PROPS (asymmetric 8/4) ──────────────── */}
+        <section className="shell pb-32" id="stack">
+          <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-[7fr_5fr]">
+            <ValueBlock
+              num="03"
+              kicker="FOR CREATORS"
+              title="Your knowledge."
+              accent="Your price."
+              points={[
+                ["Upload once", "Any file format — PDFs to ZIP archives to MP4 releases."],
+                ["100% of every sale", "Direct wallet settlement. No platform cut."],
+                ["The blob stays yours", "It sits on Walrus. You control the listing object."],
+                ["Earnings on-chain", "Settled to your Sui wallet the moment the pass changes hands."],
+              ]}
+            />
+            <ValueBlock
+              num="04"
+              kicker="FOR BUYERS"
+              title="Pay once."
+              accent="Own forever."
+              points={[
+                ["No subscriptions", "One transaction. The pass is yours, permanently."],
+                ["Verified ownership", "Tatum RPC checks the pass on every gated download."],
+                ["Instant access", "The blob streams direct from the Walrus aggregator."],
+                ["Any Sui wallet", "Sui Wallet, Surf, Ethos — anything that speaks Wallet Standard."],
+              ]}
+            />
           </div>
         </section>
       </main>
 
+      {/* ──────────────── CTA STRIP (ink zone) ──────────────── */}
+      <section className="zone-ink relative border-y border-[var(--paper-16)]" id="for">
+        <div className="shell grid grid-cols-1 items-stretch gap-10 py-24 md:grid-cols-[7fr_5fr] md:gap-16">
+          <div>
+            <div className="section-num mb-3">05 — ENTRY POINT</div>
+            <h2 className="display text-[clamp(32px,5vw,64px)]" style={{ color: "var(--paper)" }}>
+              Start selling files
+              <br />
+              <span style={{ color: "var(--signal)" }}>on Walrus today.</span>
+            </h2>
+            <p className="mono mt-6 max-w-[56ch] text-[14px] leading-7 text-[var(--paper-60)]">
+              Join the creators and builders monetising digital assets on the
+              first decentralised file marketplace built natively on Sui.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <Link className="button-primary" href="/marketplace">
+                [ EXPLORE MARKETPLACE ]
+              </Link>
+              <Link className="button-secondary" href="/upload">
+                [ UPLOAD MY FIRST FILE ]
+              </Link>
+            </div>
+          </div>
+
+          {/* Right column: brutalist status / nav panel */}
+          <div className="flex flex-col gap-6 border border-[var(--paper-16)] p-6 md:p-8">
+            <div className="flex items-center justify-between">
+              <span className="section-num">[ STATUS ]</span>
+              <span
+                className="mono inline-flex items-center gap-2 text-[11px] tracking-[0.18em]"
+                style={{ color: "var(--signal)" }}
+              >
+                ● ONLINE
+              </span>
+            </div>
+
+            <StackPills />
+
+            <div className="ascii-rule" />
+
+            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-[11px]">
+              <dt className="mono tracking-[0.18em] text-[var(--paper-40)]">CHAIN</dt>
+              <dd className="mono text-right text-[var(--paper)]">SUI · TESTNET</dd>
+              <dt className="mono tracking-[0.18em] text-[var(--paper-40)]">STORAGE</dt>
+              <dd className="mono text-right text-[var(--paper)]">WALRUS</dd>
+              <dt className="mono tracking-[0.18em] text-[var(--paper-40)]">RPC</dt>
+              <dd className="mono text-right text-[var(--paper)]">TATUM</dd>
+              <dt className="mono tracking-[0.18em] text-[var(--paper-40)]">BUILD</dt>
+              <dd
+                className="mono text-right"
+                style={{ color: "var(--paper)", fontVariantNumeric: "tabular-nums" }}
+              >
+                {buildTs.slice(0, 10)}
+              </dd>
+            </dl>
+
+            <div className="ascii-rule" />
+
+            <div className="flex flex-col gap-2 text-[12px]">
+              <Link
+                className="mono flex items-center justify-between border-b border-[var(--paper-16)] pb-2 tracking-[0.12em] text-[var(--paper)] transition hover:border-[var(--signal)] hover:text-[var(--signal)]"
+                href="/marketplace"
+              >
+                <span>BROWSE MARKETPLACE</span>
+                <span className="text-[var(--paper-40)]">/01</span>
+              </Link>
+              <Link
+                className="mono flex items-center justify-between border-b border-[var(--paper-16)] pb-2 tracking-[0.12em] text-[var(--paper)] transition hover:border-[var(--signal)] hover:text-[var(--signal)]"
+                href="/upload"
+              >
+                <span>UPLOAD A FILE</span>
+                <span className="text-[var(--paper-40)]">/02</span>
+              </Link>
+              <Link
+                className="mono flex items-center justify-between border-b border-[var(--paper-16)] pb-2 tracking-[0.12em] text-[var(--paper)] transition hover:border-[var(--signal)] hover:text-[var(--signal)]"
+                href="/library"
+              >
+                <span>YOUR LIBRARY</span>
+                <span className="text-[var(--paper-40)]">/03</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <Footer />
+    </div>
+  );
+}
+
+/** Streamed listings block — keeps the hero off the Sui RPC's critical path. */
+async function MarketplacePreview() {
+  const listings = await getMarketplaceListings();
+
+  if (listings.length === 0) {
+    return (
+      <div className="border border-dashed border-[var(--ink-40)] p-12">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="section-num">EMPTY STATE</div>
+          <h3 className="display mt-3 text-[clamp(28px,4vw,40px)]">
+            No listings yet.
+          </h3>
+          <p className="mono mx-auto mt-4 max-w-[52ch] text-[13px] leading-7 text-[var(--ink-60)]">
+            Upload a file, register a Walrus blob, and your access pass
+            will appear here. The grid waits for the first signal.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link className="button-primary" href="/upload">
+              [ UPLOAD THE FIRST FILE ]
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-4">
+      {listings.slice(0, 4).map((item) => (
+        <div className="bg-[var(--paper)]" key={item.passId}>
+          <ListingCard item={item} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MarketplacePreviewSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div className="bg-[var(--paper)] p-8" key={i}>
+          <div className="ascii-rule mb-4" />
+          <div className="mono text-[11px] tracking-[0.18em] text-[var(--ink-40)]">
+            [ LOADING · LISTING_{String(i + 1).padStart(2, "0")} ]
+          </div>
+          <div className="mt-6 h-32 border border-dashed border-[var(--ink-16)]" />
+          <div className="mt-4 h-3 w-3/4 bg-[var(--ink-08)]" />
+          <div className="mt-2 h-3 w-1/2 bg-[var(--ink-08)]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Meta({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="mono text-[9px] tracking-[0.24em] text-[var(--paper-40)]">
+        {k}
+      </span>
+      <span className="mono text-[12px] tracking-[0.06em] text-[var(--paper)]">
+        {v}
+      </span>
+    </div>
+  );
+}
+
+function CornerMark({ className = "" }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`absolute ${className}`}
+      style={{
+        width: 14,
+        height: 14,
+        borderTop: "1.5px solid rgba(250,247,240,0.75)",
+        borderLeft: "1.5px solid rgba(250,247,240,0.75)",
+        zIndex: 20,
+      }}
+    />
+  );
+}
+
+function ValueBlock({
+  num,
+  kicker,
+  title,
+  accent,
+  points,
+}: {
+  num: string;
+  kicker: string;
+  title: string;
+  accent: string;
+  points: readonly (readonly [string, string])[];
+}) {
+  return (
+    <div className="bg-[var(--paper)] p-10 md:p-14">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="section-num">{num}</span>
+        <span className="ascii-rule flex-1" />
+        <span className="tag tag-signal">[ {kicker} ]</span>
+      </div>
+      <h2 className="display text-[clamp(36px,4vw,56px)]">
+        {title}
+        <br />
+        <span style={{ color: "var(--signal-deep)" }}>{accent}</span>
+      </h2>
+      <ul className="mt-10 grid grid-cols-1 gap-6">
+        {points.map(([head, body]) => (
+          <li className="grid grid-cols-[auto_1fr] items-baseline gap-4" key={head}>
+            <span className="mono text-[12px] tracking-[0.12em] text-[var(--signal-deep)]">
+              ✓
+            </span>
+            <div>
+              <div className="mono text-[13px] font-medium tracking-[0.04em]">
+                {head}
+              </div>
+              <div className="mono mt-1 text-[12px] leading-[1.7] text-[var(--ink-60)]">
+                {body}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

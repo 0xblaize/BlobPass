@@ -1,12 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense } from "react";
-import {
-  Blocks,
-  Database,
-  Library,
-  Upload,
-} from "lucide-react";
 import { ConnectWalletButton } from "./ConnectWalletButton";
 import { GlobalMarketplaceSearch } from "./GlobalMarketplaceSearch";
 
@@ -16,25 +9,31 @@ type NavProps = {
 };
 
 const nav = [
-  { href: "/marketplace", label: "Marketplace", key: "marketplace", icon: Blocks },
-  { href: "/upload", label: "Upload", key: "upload", icon: Upload },
-  { href: "/library", label: "My Library", key: "library", icon: Library },
+  { href: "/marketplace", label: "MARKETPLACE", key: "marketplace" },
+  { href: "/upload", label: "UPLOAD", key: "upload" },
+  { href: "/library", label: "LIBRARY", key: "library" },
 ] as const;
 
-export function Logo() {
+export function Logo({ inverted = false }: { inverted?: boolean }) {
   return (
-    <Link className="flex items-center gap-2" href="/">
-      <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/35 bg-black/70 shadow-[0_0_24px_rgba(34,211,238,0.2)]">
-        <Image
-          alt="BlobPass logo"
-          className="h-full w-full object-cover"
-          height={40}
-          priority
-          src="/logo.jpg"
-          width={40}
-        />
+    <Link className="group inline-flex items-baseline gap-2" href="/">
+      <span
+        className={`mono text-xs font-bold tracking-[0.18em] ${
+          inverted ? "text-[var(--paper)]" : "text-[var(--ink)]"
+        }`}
+      >
+        [BP]
       </span>
-      <span className="title text-xl text-cyan-300">BlobPass</span>
+      <span
+        className={`mono text-sm font-bold tracking-[0.24em] ${
+          inverted ? "text-[var(--paper)]" : "text-[var(--ink)]"
+        }`}
+      >
+        BLOBPASS
+      </span>
+      <span className="mono text-[10px] tracking-[0.18em] text-[var(--signal-deep)] group-hover:text-[var(--signal)]">
+        v0.1
+      </span>
     </Link>
   );
 }
@@ -42,20 +41,25 @@ export function Logo() {
 export function Header({ active, landing = false }: NavProps) {
   if (landing) {
     return (
-      <header className="relative z-20 border-b border-white/10 bg-black/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-24 w-full max-w-[1280px] items-center justify-between gap-6 px-4">
-          <Logo />
-          <nav className="hide-mobile flex items-center gap-10 text-base font-bold text-zinc-400">
-            <a href="#how">How It Works</a>
-            <a href="#stack">The Stack</a>
-            <a href="#for">Who It&apos;s For</a>
+      <header className="zone-ink relative z-20 border-b border-[var(--paper-16)]">
+        <div className="shell flex h-14 items-center justify-between gap-6">
+          <Logo inverted />
+          <nav className="hide-mobile mono flex items-center gap-5 text-[12px] tracking-[0.18em] text-[var(--paper-60)]">
+            <a className="hover:text-[var(--paper)]" href="#how">
+              HOW
+            </a>
+            <span className="text-[var(--paper-40)]">·</span>
+            <a className="hover:text-[var(--paper)]" href="#stack">
+              STACK
+            </a>
+            <span className="text-[var(--paper-40)]">·</span>
+            <a className="hover:text-[var(--paper)]" href="#for">
+              AUDIENCE
+            </a>
           </nav>
           <div className="flex items-center gap-3">
-                       <Link
-              className="button-secondary hide-mobile min-h-12 min-w-[170px] rounded-full border-cyan-300/40 bg-black/70 px-7 text-base text-zinc-100"
-              href="/upload"
-            >
-              <Upload size={18} /> Upload File
+            <Link className="button-secondary hide-mobile" href="/upload">
+              [ UPLOAD ]
             </Link>
             <ConnectWalletButton />
           </div>
@@ -65,34 +69,34 @@ export function Header({ active, landing = false }: NavProps) {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/88 backdrop-blur">
-      <div className="shell flex h-20 items-center gap-6">
+    <header className="zone-paper sticky top-0 z-50 border-b border-[var(--ink-16)] backdrop-blur">
+      <div className="shell flex h-14 items-center gap-6">
         <Logo />
-        <nav className="hide-mobile flex items-center gap-2">
-          {nav.map((item) => {
-            const Icon = item.icon;
+        <nav className="hide-mobile mono flex items-center gap-4 text-[12px] tracking-[0.18em]">
+          {nav.map((item, i) => {
             const isActive = active === item.key;
-
             return (
-              <Link
-                className={`inline-flex h-11 items-center gap-3 rounded-lg px-4 font-bold ${
-                  isActive
-                    ? "bg-cyan-300/14 text-cyan-300"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-                href={item.href}
-                key={item.key}
-              >
-                <Icon size={17} />
-                {item.label}
-              </Link>
+              <div className="flex items-center gap-4" key={item.key}>
+                {i > 0 && <span className="text-[var(--ink-40)]">·</span>}
+                <Link
+                  className={
+                    isActive
+                      ? "text-[var(--ink)] underline decoration-[var(--signal)] decoration-2 underline-offset-[6px]"
+                      : "text-[var(--ink-60)] hover:text-[var(--ink)]"
+                  }
+                  href={item.href}
+                >
+                  {item.label}
+                </Link>
+              </div>
             );
           })}
         </nav>
         <Suspense
           fallback={
-            <div className="ml-auto hidden h-11 min-w-[280px] items-center gap-3 rounded-lg border border-white/15 bg-zinc-950 px-4 text-zinc-500 md:flex">
-              <SearchPlaceholder />
+            <div className="mono ml-auto hidden h-9 min-w-[260px] items-center gap-2 border border-[var(--ink-40)] px-3 text-[12px] text-[var(--ink-40)] md:flex">
+              <span className="text-[var(--signal-deep)]">&gt;</span>
+              <span>search marketplace_</span>
             </div>
           }
         >
@@ -104,95 +108,98 @@ export function Header({ active, landing = false }: NavProps) {
   );
 }
 
-function SearchPlaceholder() {
-  return (
-    <>
-      <span className="text-sm">Search marketplace...</span>
-    </>
-  );
-}
-
 export function Footer() {
   return (
-    <footer className="mt-32 border-t border-white/10 pb-16 pt-24 text-sm text-zinc-400">
-      <div className="shell grid gap-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
-        <div className="space-y-6">
-          <Logo />
-          <p className="max-w-xs text-[11px] leading-6 text-zinc-500">
-            The decentralized gateway for digital commerce on the Sui ecosystem. Powered by Walrus Storage.
-          </p>
-          <div className="mt-16 text-[10px] text-zinc-600">
-            Copyright 2026 BlobPass. Built for the decentralized future.
+    <footer className="zone-ink relative mt-32 border-t border-[var(--paper-16)] pb-16 pt-16">
+      <div className="shell">
+        <div className="grid gap-8 md:grid-cols-[2fr_1px_1fr_1px_1fr_1px_1fr]">
+          <div className="space-y-6">
+            <Logo inverted />
+            <p className="mono max-w-xs text-[12px] leading-6 text-[var(--paper-60)]">
+              A decentralised access ledger for files stored on Walrus, gated by
+              native Sui passes.
+            </p>
+            <div className="ascii-rule max-w-xs" />
+            <StackPills />
+            <div className="mono pt-8 text-[10px] tracking-[0.16em] text-[var(--paper-40)]">
+              © 2026 BLOBPASS · BUILT FOR THE OPEN PROTOCOL ERA
+            </div>
           </div>
-        </div>
-        <div className="space-y-6">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Marketplace</h4>
-          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
-              All Files
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/marketplace#trending-highlights">
-              Trending Highlights
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/marketplace#latest-discoveries">
-              Latest Discoveries
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/upload">
-              List an Asset
-            </Link>
+          <div className="hidden md:block">
+            <div className="h-full w-px bg-[var(--paper-16)]" />
           </div>
-        </div>
-        <div className="space-y-6">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Developers</h4>
-          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="/upload">
-              Upload Flow
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
-              Purchase Flow
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/library">
-              Download Flow
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/">
-              Architecture
-            </Link>
+          <FootCol
+            label="[ MARKET ]"
+            links={[
+              ["All files", "/marketplace"],
+              ["Trending", "/marketplace#trending-highlights"],
+              ["Latest", "/marketplace#latest-discoveries"],
+              ["List asset", "/upload"],
+            ]}
+          />
+          <div className="hidden md:block">
+            <div className="h-full w-px bg-[var(--paper-16)]" />
           </div>
-        </div>
-        <div className="space-y-6">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white">Company</h4>
-          <div className="flex flex-col gap-4 text-[11px] font-bold tracking-wider">
-            <Link className="transition-colors hover:text-cyan-300" href="/">
-              About
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/marketplace">
-              Marketplace
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/upload">
-              Upload
-            </Link>
-            <Link className="transition-colors hover:text-cyan-300" href="/library">
-              My Library
-            </Link>
+          <FootCol
+            label="[ DEVS ]"
+            links={[
+              ["Upload flow", "/upload"],
+              ["Purchase flow", "/marketplace"],
+              ["Download flow", "/library"],
+              ["Architecture", "/"],
+            ]}
+          />
+          <div className="hidden md:block">
+            <div className="h-full w-px bg-[var(--paper-16)]" />
           </div>
+          <FootCol
+            label="[ ORG ]"
+            links={[
+              ["About", "/"],
+              ["Marketplace", "/marketplace"],
+              ["Upload", "/upload"],
+              ["Library", "/library"],
+            ]}
+          />
         </div>
       </div>
     </footer>
   );
 }
 
+function FootCol({
+  label,
+  links,
+}: {
+  label: string;
+  links: readonly (readonly [string, string])[];
+}) {
+  return (
+    <div className="space-y-4">
+      <h4 className="mono text-[11px] font-medium tracking-[0.24em] text-[var(--paper)]">
+        {label}
+      </h4>
+      <div className="flex flex-col gap-3">
+        {links.map(([label, href]) => (
+          <Link
+            className="mono text-[12px] tracking-[0.06em] text-[var(--paper-60)] hover:text-[var(--signal)]"
+            href={href}
+            key={href + label}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function StackPills() {
   return (
     <div className="flex flex-wrap gap-2">
-      <span className="chip">
-        <Database size={14} /> Walrus Storage
-      </span>
-      <span className="chip border-blue-400/40 bg-blue-400/10 text-blue-300">
-        Sui Network
-      </span>
-      <span className="chip border-violet-400/40 bg-violet-400/10 text-violet-300">
-        Tatum RPC
-      </span>
+      <span className="tag tag-signal">[ WALRUS ]</span>
+      <span className="tag">[ SUI ]</span>
+      <span className="tag">[ TATUM ]</span>
     </div>
   );
 }

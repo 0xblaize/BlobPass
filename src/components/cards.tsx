@@ -6,17 +6,6 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Clock,
-  Download,
-  ExternalLink,
-  Image as ImageIcon,
-  RefreshCw,
-  ShieldCheck,
-  Wallet,
-} from "lucide-react";
 import { useState } from "react";
 import {
   buildBuyListingTransaction,
@@ -33,22 +22,19 @@ const STORAGE_TOP_UP_MIST_PER_EPOCH = BigInt("100000000");
 function hexToBytes(value: string) {
   const normalized = value.trim().replace(/^0x/i, "");
   const bytes: number[] = [];
-
   for (let index = 0; index < normalized.length; index += 2) {
     bytes.push(Number.parseInt(normalized.slice(index, index + 2), 16));
   }
-
   return bytes;
 }
 
-function VerifiedBadge({ label = "BlobPass Verified" }: { label?: string }) {
+function VerifiedBadge({ label = "VERIFIED" }: { label?: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border border-sky-300/40 bg-sky-300/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-300"
+      className="tag tag-signal"
       title="BlobPass Team verified creator"
     >
-      <BadgeCheck size={12} strokeWidth={2.5} />
-      {label}
+      [ ✓ {label} ]
     </span>
   );
 }
@@ -61,21 +47,20 @@ function PreviewImage({
   heightClass: string;
 }) {
   return (
-    <div className={`asset-image relative overflow-hidden bg-gradient-to-br ${item.gradient} ${heightClass}`}>
+    <div className={`asset-image relative overflow-hidden ${heightClass}`}>
       {item.previewImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img alt="" className="h-full w-full object-cover opacity-80" src={item.previewImageUrl} />
-      ) : (
-        <ImageIcon
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-400/70"
-          size={52}
+        <img
+          alt=""
+          className="absolute inset-0 z-[1] h-full w-full object-cover"
+          src={item.previewImageUrl}
         />
-      )}
-      <span className="absolute right-3 top-3 rounded-full bg-black/80 px-3 py-1 text-xs font-black text-cyan-300">
+      ) : null}
+      <span className="absolute right-2 top-2 z-[2] mono text-[10px] tracking-[0.16em] border border-[var(--ink)] bg-[var(--paper)] px-1.5 py-0.5 text-[var(--ink)]">
         WALRUS
       </span>
-      <span className="absolute bottom-4 left-4 rounded-full border border-cyan-300/50 bg-cyan-400/30 px-3 py-1 text-xs font-bold text-cyan-100">
-        {item.category}
+      <span className="absolute bottom-2 left-2 z-[2] mono text-[10px] tracking-[0.16em] border border-[var(--ink)] bg-[var(--paper)] px-1.5 py-0.5 text-[var(--ink)]">
+        {item.category.toUpperCase()}
       </span>
     </div>
   );
@@ -95,34 +80,24 @@ function usePurchase(item: MarketplaceListing) {
       setErrorMessage("Connect a Sui wallet before purchasing access.");
       return;
     }
-
     setState("buying");
     setErrorMessage("");
-
     try {
       const transaction = buildBuyListingTransaction({
         listingId: item.listingId,
         priceMist: item.priceMist,
         listingInitialSharedVersion: item.listingInitialSharedVersion,
       });
-
-      const txResult = await signAndExecute.mutateAsync({
-        transaction,
-      });
-
+      const txResult = await signAndExecute.mutateAsync({ transaction });
       const finalized = await suiClient.waitForTransaction({
         digest: txResult.digest,
-        options: {
-          showEvents: true,
-          showObjectChanges: true,
-        },
+        options: { showEvents: true, showObjectChanges: true },
       });
-
       const purchasedEvent = getListingPurchasedEvent(finalized);
       const transferredPass = getTransferredPassChange(finalized);
       const passId =
-        purchasedEvent?.pass_id || (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : undefined);
-
+        purchasedEvent?.pass_id ||
+        (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : undefined);
       const response = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,12 +108,10 @@ function usePurchase(item: MarketplaceListing) {
           transactionDigest: txResult.digest,
         }),
       });
-
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error || "Purchase request failed");
       }
-
       await queryClient.invalidateQueries({ queryKey: ["library"] });
       setState("owned");
     } catch (error) {
@@ -164,10 +137,8 @@ function useStorageTopUp(asset: LibraryAssetView) {
       setErrorMessage("Connect a Sui wallet before extending storage.");
       return;
     }
-
     setState("signing");
     setErrorMessage("");
-
     try {
       const transaction = buildStorageTopUpTransaction({
         fileHashBytes: hexToBytes(asset.fileHash),
@@ -175,21 +146,12 @@ function useStorageTopUp(asset: LibraryAssetView) {
         topUpMist: (STORAGE_TOP_UP_MIST_PER_EPOCH * BigInt(additionalEpochs)).toString(),
         blobObjectId: asset.blobObjectId,
       });
-
-      const txResult = await signAndExecute.mutateAsync({
-        transaction,
-      });
-
+      const txResult = await signAndExecute.mutateAsync({ transaction });
       setState("confirming");
-
       await suiClient.waitForTransaction({
         digest: txResult.digest,
-        options: {
-          showEvents: true,
-          showObjectChanges: true,
-        },
+        options: { showEvents: true, showObjectChanges: true },
       });
-
       const response = await fetch("/api/storage-top-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,12 +162,10 @@ function useStorageTopUp(asset: LibraryAssetView) {
           transactionDigest: txResult.digest,
         }),
       });
-
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error || "Storage top-up sync failed");
       }
-
       await queryClient.invalidateQueries({ queryKey: ["library"] });
       setState("idle");
     } catch (error) {
@@ -231,35 +191,24 @@ function useDelist(asset: LibraryAssetView) {
       setErrorMessage("Connect the seller wallet before delisting.");
       return;
     }
-
     setState("signing");
     setErrorMessage("");
-
     try {
       const transaction = buildDelistListingTransaction({
         listingId: asset.listingId,
         listingInitialSharedVersion: asset.listingInitialSharedVersion,
       });
-
-      const txResult = await signAndExecute.mutateAsync({
-        transaction,
-      });
-
+      const txResult = await signAndExecute.mutateAsync({ transaction });
       setState("confirming");
-
       const finalized = await suiClient.waitForTransaction({
         digest: txResult.digest,
-        options: {
-          showEvents: true,
-          showObjectChanges: true,
-        },
+        options: { showEvents: true, showObjectChanges: true },
       });
-
       const delistedEvent = getListingDelistedEvent(finalized);
       const transferredPass = getTransferredPassChange(finalized);
       const passId =
-        delistedEvent?.pass_id || (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : asset.passId);
-
+        delistedEvent?.pass_id ||
+        (typeof transferredPass?.objectId === "string" ? transferredPass.objectId : asset.passId);
       const response = await fetch("/api/delist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -270,12 +219,10 @@ function useDelist(asset: LibraryAssetView) {
           transactionDigest: txResult.digest,
         }),
       });
-
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error || "Delist sync failed");
       }
-
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["library"] }),
         queryClient.invalidateQueries({ queryKey: ["marketplace"] }),
@@ -290,41 +237,78 @@ function useDelist(asset: LibraryAssetView) {
   return { delist, state, errorMessage };
 }
 
+function EditionChip({
+  item,
+}: {
+  item: Pick<MarketplaceListing, "editionsMinted" | "editionTotal" | "soldOut">;
+}) {
+  if (item.soldOut) {
+    return <span className="tag" style={{ color: "#c0392b", borderColor: "#c0392b" }}>[ SOLD OUT ]</span>;
+  }
+  return (
+    <span className="tag">
+      [ ED {item.editionsMinted}/{item.editionTotal} ]
+    </span>
+  );
+}
+
 export function ListingCard({ item }: { item: MarketplaceListing }) {
   const { buy, state, account, errorMessage } = usePurchase(item);
+  const buyDisabled =
+    state === "buying" || state === "owned" || !account?.address || item.soldOut;
 
   return (
-    <article className="panel overflow-hidden rounded-lg">
-      <PreviewImage heightClass="h-44" item={item} />
-      <div className="space-y-4 p-5">
+    <article className="surface surface-interactive flex flex-col bg-[var(--paper)]">
+      <PreviewImage heightClass="h-48" item={item} />
+      <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-xl font-black">{item.title}</h3>
+          <h3 className="mono text-[15px] font-medium leading-tight tracking-[0.02em]">
+            {item.title}
+          </h3>
           {item.verified ? <VerifiedBadge /> : null}
         </div>
-        <p className="min-h-12 text-sm leading-6 text-zinc-400">{item.description}</p>
-        <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span className="inline-flex items-center gap-1.5">
-            {item.seller}
-            {item.verified ? <BadgeCheck className="text-sky-300" size={14} strokeWidth={2.5} /> : null}
-          </span>
+        <p className="mono min-h-[3rem] text-[12px] leading-6 text-[var(--ink-60)]">
+          {item.description}
+        </p>
+        <div className="mono flex items-center justify-between text-[11px] tracking-[0.04em] text-[var(--ink-60)]">
+          <span>@{item.seller.replace(/^@/, "")}</span>
           <span>{item.date}</span>
         </div>
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <EditionChip item={item} />
+          {!item.soldOut && item.editionTotal > 1 ? (
+            <span className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+              {item.editionsRemaining} LEFT
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-auto flex items-end justify-between gap-4 border-t border-[var(--ink-16)] pt-4">
           <div>
-            <div className="text-xs font-bold text-zinc-400">PRICE</div>
-            <div className="title text-2xl text-cyan-300">{item.price} SUI</div>
+            <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+              PRICE
+            </div>
+            <div className="mono mt-1 text-[20px] font-medium tabular-nums">
+              {item.price}
+              <span className="ml-1 text-[12px] text-[var(--ink-40)]">SUI</span>
+            </div>
           </div>
           <button
-            className="button-primary min-h-10 px-4 text-sm"
-            disabled={state === "buying" || state === "owned" || !account?.address}
+            className="button-primary"
+            disabled={buyDisabled}
             onClick={buy}
             type="button"
           >
-            {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Access"}
+            {item.soldOut
+              ? "[ SOLD OUT ]"
+              : state === "buying"
+                ? "[ ... ]"
+                : state === "owned"
+                  ? "[ OWNED ]"
+                  : "[ BUY ]"}
           </button>
         </div>
         {state === "error" ? (
-          <p className="text-xs font-bold text-red-300">{errorMessage}</p>
+          <p className="mono text-[11px] text-[#c0392b]">{errorMessage}</p>
         ) : null}
       </div>
     </article>
@@ -333,54 +317,68 @@ export function ListingCard({ item }: { item: MarketplaceListing }) {
 
 export function FeatureListing({ item }: { item: MarketplaceListing }) {
   const { buy, state, account, errorMessage } = usePurchase(item);
+  const buyDisabled =
+    state === "buying" || state === "owned" || !account?.address || item.soldOut;
 
   return (
-    <article className="panel grid gap-5 rounded-xl border-cyan-300/30 p-6 md:grid-cols-[220px_1fr]">
-      <PreviewImage heightClass="min-h-56 rounded-lg" item={item} />
-      <div className="flex flex-col justify-between gap-5">
-        <div className="space-y-4">
+    <article className="surface surface-interactive grid gap-0 bg-[var(--paper)] md:grid-cols-[280px_1fr]">
+      <PreviewImage heightClass="min-h-64 md:min-h-full" item={item} />
+      <div className="flex flex-col justify-between gap-6 p-7">
+        <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
-            <span className="chip bg-cyan-300 text-black">Featured</span>
-            <span className="chip">Walrus Storage</span>
+            <span className="tag" style={{ background: "var(--ink)", color: "var(--paper)", borderColor: "var(--ink)" }}>
+              [ FEATURED ]
+            </span>
+            <span className="tag tag-signal">[ WALRUS ]</span>
             {item.verified ? <VerifiedBadge /> : null}
+            <EditionChip item={item} />
           </div>
-          <h2 className="title text-2xl leading-tight">{item.title}</h2>
-          <p className="leading-7 text-zinc-300">{item.description} Processed via Sui-parallel clusters.</p>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-xs font-bold text-zinc-500">SELLER</div>
-              <div className="inline-flex items-center gap-1.5">
-                {item.seller}
-                {item.verified ? <BadgeCheck className="text-sky-300" size={14} strokeWidth={2.5} /> : null}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-zinc-500">SIZE</div>
-              <div>{item.size}</div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-zinc-500">PURCHASES</div>
-              <div>{item.purchases}</div>
-            </div>
+          <h2 className="display text-[clamp(26px,3vw,40px)]">{item.title}</h2>
+          <p className="mono text-[13px] leading-7 text-[var(--ink-60)]">
+            {item.description}
+          </p>
+          <div className="grid grid-cols-3 gap-4 border-y border-[var(--ink-16)] py-4">
+            <Stat label="SELLER" value={`@${item.seller.replace(/^@/, "")}`} />
+            <Stat label="SIZE" value={item.size} />
+            <Stat label="EDITIONS" value={`${item.editionsMinted}/${item.editionTotal}`} />
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="title text-3xl text-cyan-300">{item.price} SUI</div>
-          <button
-            className="button-primary"
-            disabled={state === "buying" || state === "owned" || !account?.address}
-            onClick={buy}
-            type="button"
-          >
-            {state === "buying" ? "Buying..." : state === "owned" ? "Owned" : "Buy Instant Access"}
-            <ArrowRight size={18} />
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+              PRICE
+            </div>
+            <div className="mono text-[32px] font-medium leading-none tabular-nums">
+              {item.price}
+              <span className="ml-2 text-[14px] text-[var(--ink-40)]">SUI</span>
+            </div>
+          </div>
+          <button className="button-primary" disabled={buyDisabled} onClick={buy} type="button">
+            {item.soldOut
+              ? "[ SOLD OUT ]"
+              : state === "buying"
+                ? "[ ... ]"
+                : state === "owned"
+                  ? "[ OWNED ]"
+                  : "[ BUY INSTANT ACCESS ]"}
           </button>
         </div>
         {state === "error" ? (
-          <p className="text-xs font-bold text-red-300">{errorMessage}</p>
+          <p className="mono text-[11px] text-[#c0392b]">{errorMessage}</p>
         ) : null}
       </div>
     </article>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+        {label}
+      </div>
+      <div className="mono mt-1 text-[13px] tracking-[0.02em]">{value}</div>
+    </div>
   );
 }
 
@@ -391,79 +389,96 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const delist = useDelist(asset);
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "error">("idle");
   const [downloadError, setDownloadError] = useState("");
+
   const storageTone =
     asset.storageHealth === "expired"
-      ? "border-red-400/30 bg-red-400/10 text-red-200"
+      ? { label: "EXPIRED", color: "#c0392b" }
       : asset.storageHealth === "expiring"
-        ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
-        : "border-cyan-300/25 bg-cyan-300/8 text-cyan-100";
+        ? { label: "EXPIRING", color: "#d4a853" }
+        : { label: "ACTIVE", color: "var(--signal-deep)" };
 
   return (
-    <article className="panel overflow-hidden rounded-lg">
+    <article className="surface flex flex-col bg-[var(--paper)]">
       <div className="relative">
-        <PreviewImage heightClass="h-48" item={asset} />
+        <PreviewImage heightClass="h-52" item={asset} />
         <span
-          className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-black ${
-            owned ? "bg-cyan-300 text-black" : "bg-black text-white"
-          }`}
+          className="tag absolute left-2 top-2 z-[3]"
+          style={{
+            background: owned ? "var(--signal)" : "var(--ink)",
+            color: owned ? "var(--ink)" : "var(--paper)",
+            borderColor: owned ? "var(--signal)" : "var(--ink)",
+          }}
         >
-          {asset.status}
-        </span>
-        <span className="absolute bottom-3 right-3 rounded-md border border-white/15 bg-black/70 px-3 py-1 text-xs font-black">
-          WALRUS ONLINE
+          [ {asset.status.toUpperCase()} ]
         </span>
       </div>
-      <div className="space-y-4 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-black uppercase text-cyan-300">{asset.category}</div>
-            <h3 className="mt-1 text-xl font-black inline-flex items-center gap-2">
-              {asset.title}
-              {asset.verified ? <BadgeCheck className="text-sky-300" size={18} strokeWidth={2.5} /> : null}
-            </h3>
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <div>
+          <div className="mono text-[10px] tracking-[0.18em] text-[var(--signal-deep)]">
+            {asset.category.toUpperCase()}
           </div>
-          {asset.verified ? <VerifiedBadge /> : null}
+          <h3 className="mono mt-1 flex items-center gap-2 text-[16px] font-medium leading-tight">
+            {asset.title}
+            {asset.verified ? <VerifiedBadge label="VRF" /> : null}
+          </h3>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 text-xs text-zinc-400">
+        <div className="mono flex flex-wrap items-center justify-between gap-3 border-t border-[var(--ink-16)] pt-3 text-[11px] tracking-[0.04em] text-[var(--ink-60)]">
           <span>{asset.date}</span>
-          <span>{asset.blobLabel}</span>
+          <span className="tabular-nums">{asset.blobLabel}</span>
         </div>
         {asset.price ? (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-zinc-400">List Price</span>
-            <strong className="text-cyan-300">{asset.price}</strong>
+          <div className="mono flex items-center justify-between text-[13px]">
+            <span className="text-[var(--ink-40)]">LIST PRICE</span>
+            <strong className="tabular-nums">{asset.price}</strong>
           </div>
         ) : null}
-        <div className={`rounded-lg border p-4 text-sm ${storageTone}`}>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 font-black">
-              <Clock size={16} /> Keep-Alive
-            </span>
-            <span className="mono text-xs">Epoch {asset.storageEndEpoch}</span>
+        {asset.editionTotal > 1 || asset.soldOut ? (
+          <div className="mono flex items-center justify-between text-[13px]">
+            <span className="text-[var(--ink-40)]">EDITIONS</span>
+            <strong
+              className="tabular-nums"
+              style={{ color: asset.soldOut ? "#c0392b" : "var(--ink)" }}
+            >
+              {asset.soldOut ? "SOLD OUT" : `${asset.editionsMinted}/${asset.editionTotal}`}
+            </strong>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        ) : null}
+
+        {/* Keep-alive block */}
+        <div className="border border-[var(--ink-16)] p-3">
+          <div className="mono mb-2 flex items-center justify-between gap-3 text-[11px] tracking-[0.12em]">
+            <span style={{ color: storageTone.color }}>
+              [ {storageTone.label} ] STORAGE
+            </span>
+            <span className="text-[var(--ink-40)] tabular-nums">
+              EP {asset.storageEndEpoch}
+            </span>
+          </div>
+          <div className="mono flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--ink-60)]">
             <span>{asset.storageRenewalLabel}</span>
             <button
-              className="button-secondary min-h-9 px-3 text-xs"
+              className="button-secondary"
+              style={{ minHeight: 32, fontSize: 11, padding: "0 0.75rem" }}
               disabled={topUp.state === "signing" || topUp.state === "confirming" || !asset.fileHash}
               onClick={() => void topUp.topUp(1)}
               type="button"
             >
-              <RefreshCw size={14} />
               {topUp.state === "signing"
-                ? "Sign"
+                ? "[ SIGN ]"
                 : topUp.state === "confirming"
-                  ? "Syncing"
-                  : "Top Up"}
+                  ? "[ SYNC... ]"
+                  : "[ TOP UP +1EP ]"}
             </button>
           </div>
-          {topUp.errorMessage ? <p className="mt-3 text-xs font-bold text-red-200">{topUp.errorMessage}</p> : null}
+          {topUp.errorMessage ? (
+            <p className="mono mt-2 text-[11px] text-[#c0392b]">{topUp.errorMessage}</p>
+          ) : null}
         </div>
+
         {listedByUser ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <a className="button-secondary w-full" href="/marketplace">
-              <ExternalLink size={17} />
-              {asset.action}
+              [ VIEW LISTING ]
             </a>
             <button
               className="button-primary w-full"
@@ -472,12 +487,12 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
               type="button"
             >
               {delist.state === "signing"
-                ? "Sign Delist"
+                ? "[ SIGN ]"
                 : delist.state === "confirming"
-                  ? "Confirming"
+                  ? "[ ... ]"
                   : delist.state === "delisted"
-                    ? "Delisted"
-                    : "Delist"}
+                    ? "[ DELISTED ]"
+                    : "[ DELIST ]"}
             </button>
           </div>
         ) : owned && asset.rawFileBlobId ? (
@@ -487,35 +502,28 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
             onClick={async () => {
               const search = new URLSearchParams(asset.downloadUrl?.split("?")[1] ?? "");
               const walletAddress = search.get("address");
-
               if (!walletAddress) {
                 setDownloadState("error");
                 setDownloadError("No wallet address was attached to this asset download.");
                 return;
               }
-
               setDownloadState("downloading");
               setDownloadError("");
-
               const response = await fetch("/api/download", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   passId: asset.passId,
                   blobId: asset.rawFileBlobId,
                   walletAddress,
                 }),
               });
-
               if (!response.ok) {
                 const payload = (await response.json().catch(() => null)) as { error?: string } | null;
                 setDownloadState("error");
                 setDownloadError(payload?.error || "Access denied: this wallet does not own the required Blob Pass.");
                 return;
               }
-
               const blob = await response.blob();
               const downloadUrl = window.URL.createObjectURL(blob);
               const link = document.createElement("a");
@@ -529,20 +537,22 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
             }}
             type="button"
           >
-            <Download size={17} />
-            {downloadState === "downloading" ? "Downloading..." : asset.action}
+            {downloadState === "downloading" ? "[ DOWNLOADING... ]" : `[ ${asset.action.toUpperCase()} ]`}
           </button>
         ) : (
           <a
             className={owned ? "button-primary w-full" : "button-secondary w-full"}
             href={asset.downloadUrl ?? "/marketplace"}
           >
-            {owned ? <Download size={17} /> : <ExternalLink size={17} />}
-            {asset.action}
+            [ {asset.action.toUpperCase()} ]
           </a>
         )}
-        {downloadError ? <p className="text-xs font-bold text-red-300">{downloadError}</p> : null}
-        {delist.errorMessage ? <p className="text-xs font-bold text-red-300">{delist.errorMessage}</p> : null}
+        {downloadError ? (
+          <p className="mono text-[11px] text-[#c0392b]">{downloadError}</p>
+        ) : null}
+        {delist.errorMessage ? (
+          <p className="mono text-[11px] text-[#c0392b]">{delist.errorMessage}</p>
+        ) : null}
       </div>
     </article>
   );
@@ -560,18 +570,18 @@ export function StatCard({
   note: string;
 }) {
   return (
-    <div className="panel rounded-lg p-7">
-      <div className="mb-8 flex items-center justify-between">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-black text-cyan-300">{icon}</div>
-        <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-zinc-400">
-          Live Stats
+    <div className="surface bg-[var(--paper)] p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <span className="mono text-[11px] tracking-[0.18em] text-[var(--ink-40)]">
+          {label}
+        </span>
+        <span className="text-[var(--signal-deep)]" aria-hidden>
+          {icon}
         </span>
       </div>
-      <div className="text-xs font-black uppercase text-zinc-500">{label}</div>
-      <div className="title mt-1 text-3xl">{value}</div>
-      <p className="mt-4 text-sm text-zinc-400">{note}</p>
+      <div className="display text-[40px] leading-none tabular-nums">{value}</div>
+      <div className="ascii-rule mt-4" />
+      <p className="mono mt-4 text-[12px] leading-6 text-[var(--ink-60)]">{note}</p>
     </div>
   );
 }
-
-export const cardIcons = { ShieldCheck, Wallet };

@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
     const sellerAddress = formString(formData, "sellerAddress", DEMO_SELLER_ADDRESS);
     const fileHash = formString(formData, "fileHash");
     const storageEndEpoch = rawUpload.storageEndEpoch;
+    const editionSizeRaw = Number.parseInt(formString(formData, "editionSize", "1"), 10);
+    const editionSize = Number.isFinite(editionSizeRaw) && editionSizeRaw >= 1 ? editionSizeRaw : 1;
 
     return NextResponse.json({
       ok: true,
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
             "14",
           10,
         ),
+        editionSize,
       },
       nativeSui: getNativeSuiConfig(),
     });

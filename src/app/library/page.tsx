@@ -10,16 +10,26 @@ export default async function LibraryPage() {
   return (
     <>
       <Header active="library" />
-      <main className="shell py-16">
-        <section className="flex flex-wrap items-end justify-between gap-8">
+      <main className="shell pb-24 pt-16">
+        <section className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[7fr_5fr]">
           <div>
-            <h1 className="title text-5xl">Your Asset Library</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-400">
-              Manage your decentralized digital inventory. All assets are
-              verified on the Sui Network and securely stored on Walrus.
+            <div className="section-num mb-3">03 — LEDGER</div>
+            <h1 className="display text-[clamp(36px,5vw,64px)]">
+              Your asset
+              <br />
+              <span style={{ color: "var(--signal-deep)" }}>library.</span>
+            </h1>
+            <p className="mono mt-8 max-w-[52ch] text-[14px] leading-[1.8] text-[var(--ink-60)]">
+              Every pass your wallet holds, every listing it published. Verified
+              against Sui object ownership, decoded from Walrus blob receipts —
+              no servers, no second guesses.
             </p>
           </div>
-          <StackPills />
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <div className="ascii-rule w-full" />
+            <div className="section-num">PROTOCOL STACK</div>
+            <StackPills />
+          </div>
         </section>
 
         <LibraryGrid initialAssets={assets} initialStats={stats} />

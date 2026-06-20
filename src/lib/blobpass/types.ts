@@ -45,6 +45,8 @@ export type DataAccessPassObject = {
   duplicateOfPassId?: string;
   lastTransactionDigest?: string;
   lastStorageTopUpDigest?: string;
+  totalSupply: number;
+  passesMinted: number;
   content: {
     fields: DataAccessPassFields;
   };
@@ -90,6 +92,10 @@ export type MarketplaceListing = {
   storageHealth: StorageHealth;
   royaltyBps: number;
   verified: boolean;
+  editionTotal: number;
+  editionsMinted: number;
+  editionsRemaining: number;
+  soldOut: boolean;
 };
 
 export type LibraryAssetView = {
@@ -118,6 +124,10 @@ export type LibraryAssetView = {
   storageRenewalLabel: string;
   royaltyBps: number;
   verified: boolean;
+  editionTotal: number;
+  editionsMinted: number;
+  editionsRemaining: number;
+  soldOut: boolean;
 };
 
 export type LibraryStats = {

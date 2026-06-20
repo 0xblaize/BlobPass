@@ -45,7 +45,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     fill.position.set(3, 2, 5);
     scene.add(fill);
 
-    const rim = new THREE.DirectionalLight("#00f0ff", 2.7);
+    const rim = new THREE.DirectionalLight("#00c853", 2.7);
     rim.position.set(5, 4, -4);
     scene.add(rim);
 
@@ -117,8 +117,8 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     );
 
     const resize = () => {
-      const width = mount.clientWidth || 320;
-      const height = mount.clientHeight || 520;
+      const width = mount.clientWidth || 360;
+      const height = mount.clientHeight || 360;
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
@@ -126,7 +126,11 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     };
 
     resize();
+    requestAnimationFrame(resize);
     window.addEventListener("resize", resize);
+
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(mount);
 
     const visibilityObserver = new IntersectionObserver(
       ([entry]) => {
@@ -158,6 +162,7 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
       visibilityObserver.disconnect();
+      ro.disconnect();
       controls.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
@@ -174,5 +179,35 @@ export function RabbitScene({ className = "" }: RabbitSceneProps) {
     };
   }, []);
 
-  return <div className={className} ref={mountRef} />;
+  return (
+    <div className={`relative ${className}`}>
+      <div className="absolute inset-0" ref={mountRef} />
+      {!loaded && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <div className="text-center">
+            <div
+              className="mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.22em",
+                color: "rgba(250,247,240,0.55)",
+              }}
+            >
+              LOADING · RABBIT.GLB
+            </div>
+            <div
+              className="mono mt-2"
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.18em",
+                color: "#00c853",
+              }}
+            >
+              4.0 MB · GLTF 2.0
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

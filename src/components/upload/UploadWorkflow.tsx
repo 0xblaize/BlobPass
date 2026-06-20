@@ -5,14 +5,6 @@ import {
   useSignAndExecuteTransaction,
   useSuiClient,
 } from "@mysten/dapp-kit";
-import {
-  ArrowRight,
-  CheckCircle,
-  Database,
-  FileText,
-  ShieldCheck,
-  Upload,
-} from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { suiToMist } from "@/lib/blobpass/format";
@@ -55,6 +47,7 @@ type UploadResponse = {
     storageEpochs: number;
     storageEndEpoch?: number;
     storageEpochDurationDays: number;
+    editionSize?: number;
   };
   nativeSui: {
     configured: boolean;
@@ -96,10 +89,10 @@ type IndexedListingResponse = {
 };
 
 const flow = [
-  { label: "Hash", icon: ShieldCheck },
-  { label: "Metadata", icon: FileText },
-  { label: "Walrus Store", icon: Database },
-  { label: "Mint & List", icon: CheckCircle },
+  { num: "01", label: "HASH" },
+  { num: "02", label: "META" },
+  { num: "03", label: "STORE" },
+  { num: "04", label: "MINT" },
 ];
 
 function bytesToHex(bytes: Uint8Array) {
@@ -109,11 +102,9 @@ function bytesToHex(bytes: Uint8Array) {
 function hexToBytes(value: string) {
   const normalized = value.trim().replace(/^0x/i, "");
   const bytes: number[] = [];
-
   for (let index = 0; index < normalized.length; index += 2) {
     bytes.push(Number.parseInt(normalized.slice(index, index + 2), 16));
   }
-
   return bytes;
 }
 
@@ -127,6 +118,27 @@ function toNumber(value: string | number | undefined, fallback = 0) {
   return Number.isFinite(parsed) ? Number(parsed) : fallback;
 }
 
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
+const ZIP_EOCD_MAX_SCAN = 65557;
+
+function looksLikeZip(file: File) {
+  if (file.type.includes("zip")) return true;
+  return /\.zip$/i.test(file.name);
+}
+
+async function countZipEntries(file: File): Promise<number | null> {
+  if (!looksLikeZip(file) || file.size < 22) return null;
+  const tailLength = Math.min(ZIP_EOCD_MAX_SCAN, file.size);
+  const tail = await file.slice(file.size - tailLength).arrayBuffer();
+  const view = new DataView(tail);
+  for (let offset = view.byteLength - 22; offset >= 0; offset -= 1) {
+    if (view.getUint32(offset, true) !== ZIP_EOCD_SIGNATURE) continue;
+    const totalEntries = view.getUint16(offset + 10, true);
+    return totalEntries > 0 ? totalEntries : null;
+  }
+  return null;
+}
+
 export function UploadWorkflow() {
   const account = useCurrentAccount();
   const suiClient = useSuiClient();
@@ -138,6 +150,8 @@ export function UploadWorkflow() {
   const [category, setCategory] = useState("Digital Asset");
   const [priceSui, setPriceSui] = useState("1");
   const [storageEpochs, setStorageEpochs] = useState("5");
+  const [editionSize, setEditionSize] = useState("1");
+  const [editionAutoDetected, setEditionAutoDetected] = useState(false);
   const [fileHash, setFileHash] = useState("");
   const [hashStatus, setHashStatus] = useState<"idle" | "hashing" | "checked" | "error">("idle");
   const [duplicateMatch, setDuplicateMatch] = useState<HashCheckResponse["match"] | null>(null);
@@ -149,22 +163,10 @@ export function UploadWorkflow() {
   const [error, setError] = useState("");
 
   const activeStep = useMemo(() => {
-    if (status === "stored") {
-      return 3;
-    }
-
-    if (status === "hashing" || hashStatus === "hashing") {
-      return 0;
-    }
-
-    if (status === "uploading" || status === "signing" || status === "confirming") {
-      return 2;
-    }
-
-    if (assetFile) {
-      return 1;
-    }
-
+    if (status === "stored") return 3;
+    if (status === "hashing" || hashStatus === "hashing") return 0;
+    if (status === "uploading" || status === "signing" || status === "confirming") return 2;
+    if (assetFile) return 1;
     return 0;
   }, [assetFile, hashStatus, status]);
 
@@ -173,29 +175,27 @@ export function UploadWorkflow() {
     setFileHash("");
     setDuplicateMatch(null);
     setHashStatus("idle");
-
-    if (!nextFile) {
-      return;
-    }
-
+    setEditionSize("1");
+    setEditionAutoDetected(false);
+    if (!nextFile) return;
     setHashStatus("hashing");
     setError("");
-
     try {
+      const detectedEntries = await countZipEntries(nextFile);
+      if (detectedEntries && detectedEntries > 0) {
+        setEditionSize(String(detectedEntries));
+        setEditionAutoDetected(true);
+      }
       const digest = await hashFile(nextFile);
       setFileHash(digest);
-
       const response = await fetch(`/api/hash-check?fileHash=${encodeURIComponent(digest)}`);
       const payload = (await response.json()) as HashCheckResponse | { error?: string };
-
       if (!response.ok) {
         throw new Error("error" in payload && payload.error ? payload.error : "Hash registry check failed");
       }
-
       if ("exists" in payload && payload.exists) {
         setDuplicateMatch(payload.match ?? null);
       }
-
       setHashStatus("checked");
     } catch (hashError) {
       setHashStatus("error");
@@ -205,80 +205,56 @@ export function UploadWorkflow() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!account?.address) {
       setError("Connect a Sui wallet before storing or minting access.");
       return;
     }
-
     if (!assetFile) {
       setError("Select an asset file first.");
       return;
     }
-
     setError("");
     setResponse(null);
     setTxDigest("");
-
     try {
-      if (!fileHash) {
-        setStatus("hashing");
-      }
-
+      if (!fileHash) setStatus("hashing");
       const digest = fileHash || (await hashFile(assetFile));
       const hashBytes = hexToBytes(digest);
       setFileHash(digest);
       let existingMatch = duplicateMatch;
-
       if (!existingMatch) {
         const hashResponse = await fetch(`/api/hash-check?fileHash=${encodeURIComponent(digest)}`);
         const hashPayload = (await hashResponse.json()) as HashCheckResponse | { error?: string };
-
         if (!hashResponse.ok) {
           throw new Error(
             "error" in hashPayload && hashPayload.error ? hashPayload.error : "Hash registry check failed",
           );
         }
-
         if ("exists" in hashPayload && hashPayload.exists && hashPayload.match) {
           existingMatch = hashPayload.match;
           setDuplicateMatch(hashPayload.match);
         }
       }
-
       if (existingMatch) {
         setStatus("signing");
-
         const pointerTx = buildMintAccessPointerTransaction({
           fileHashBytes: hashBytes,
           royaltyMist: existingMatch.royaltyMist,
         });
-
-        const pointerTxResult = await signAndExecute.mutateAsync({
-          transaction: pointerTx,
-        });
-
+        const pointerTxResult = await signAndExecute.mutateAsync({ transaction: pointerTx });
         setTxDigest(pointerTxResult.digest);
         setStatus("confirming");
-
         const pointerFinalized = await suiClient.waitForTransaction({
           digest: pointerTxResult.digest,
-          options: {
-            showEvents: true,
-            showObjectChanges: true,
-          },
+          options: { showEvents: true, showObjectChanges: true },
         });
-
         const pointerEvent = getAccessPointerMintedEvent(pointerFinalized);
         const pointerPassChange = getCreatedPassChange(pointerFinalized) || getTransferredPassChange(pointerFinalized);
         const pointerPassId =
           pointerEvent?.pass_id || (typeof pointerPassChange?.objectId === "string" ? pointerPassChange.objectId : "");
-
         const pointerResponse = await fetch("/api/access-pointer", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fileHash: digest,
             buyerAddress: account.address,
@@ -287,35 +263,20 @@ export function UploadWorkflow() {
             passId: pointerPassId,
           }),
         });
-
         const pointerPayload = (await pointerResponse.json()) as
-          | {
-              pass: IndexedListingResponse["pass"];
-              error?: string;
-            }
+          | { pass: IndexedListingResponse["pass"]; error?: string }
           | { error?: string };
-
         if (!pointerResponse.ok || !("pass" in pointerPayload)) {
           throw new Error(pointerPayload.error || "BlobPass could not index the duplicate access pointer.");
         }
-
-        setResponse({
-          ok: true,
-          pass: pointerPayload.pass,
-        });
+        setResponse({ ok: true, pass: pointerPayload.pass });
         setStatus("stored");
         return;
       }
-
       setStatus("uploading");
-
       const formData = new FormData();
       formData.append("asset", assetFile);
-
-      if (previewFile) {
-        formData.append("preview", previewFile);
-      }
-
+      if (previewFile) formData.append("preview", previewFile);
       formData.append("title", title || assetFile.name);
       formData.append("description", description);
       formData.append("category", category);
@@ -323,34 +284,24 @@ export function UploadWorkflow() {
       formData.append("sellerAddress", account.address);
       formData.append("fileHash", digest);
       formData.append("storageEpochs", storageEpochs);
-
-      const result = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
+      formData.append("editionSize", editionSize);
+      const result = await fetch("/api/upload", { method: "POST", body: formData });
       const payload: unknown = await result.json();
-
       if (!result.ok) {
         throw new Error(
-          payload && typeof payload === "object" && "error" in payload
-            ? String(payload.error)
-            : "Upload failed",
+          payload && typeof payload === "object" && "error" in payload ? String(payload.error) : "Upload failed",
         );
       }
-
       const uploadPayload = payload as UploadResponse;
       const priceMist = uploadPayload.asset.priceMist || suiToMist(priceSui);
       const storageEpochCount = Math.max(1, Number.parseInt(storageEpochs, 10) || uploadPayload.asset.storageEpochs || 5);
-
+      const totalSupplyCount = Math.max(1, Number.parseInt(editionSize, 10) || 1);
       if (!uploadPayload.nativeSui.configured) {
         throw new Error(
           `BlobPass on-chain registry is not configured. Missing: ${uploadPayload.nativeSui.missing.join(", ")}`,
         );
       }
-
       setStatus("signing");
-
       const transaction = buildCreateRegisteredListingTransaction({
         title: uploadPayload.asset.title,
         description: uploadPayload.asset.description,
@@ -360,24 +311,16 @@ export function UploadWorkflow() {
         walrusBlobId: uploadPayload.rawFileBlobId,
         fileHashBytes: hashBytes,
         storageEpochs: storageEpochCount,
+        totalSupply: totalSupplyCount,
         priceMist,
       });
-
-      const txResult = await signAndExecute.mutateAsync({
-        transaction,
-      });
-
+      const txResult = await signAndExecute.mutateAsync({ transaction });
       setTxDigest(txResult.digest);
       setStatus("confirming");
-
       const finalized = await suiClient.waitForTransaction({
         digest: txResult.digest,
-        options: {
-          showEvents: true,
-          showObjectChanges: true,
-        },
+        options: { showEvents: true, showObjectChanges: true },
       });
-
       const createdEvent = getListingCreatedEvent(finalized);
       const blobRegisteredEvent = getBlobRegisteredEvent(finalized);
       const listingChange = getCreatedListingChange(finalized);
@@ -387,29 +330,21 @@ export function UploadWorkflow() {
       let passId =
         createdEvent?.pass_id || (typeof passChange?.objectId === "string" ? passChange.objectId : "");
       const listingInitialSharedVersion = getInitialSharedVersionFromChange(listingChange);
-
       if (!passId && listingId) {
         const listingObject = await suiClient.getObject({
           id: listingId,
-          options: {
-            showContent: true,
-          },
+          options: { showContent: true },
         });
-
         passId = extractPassIdFromListingObject(listingObject);
       }
-
       if (!listingId || !passId) {
         throw new Error(
           "The listing transaction succeeded, but BlobPass could not read the created listing or pass IDs.",
         );
       }
-
       const indexResponse = await fetch("/api/index-listing", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sellerAddress: account.address,
           title: uploadPayload.asset.title,
@@ -432,6 +367,8 @@ export function UploadWorkflow() {
           storageEpochDurationDays: uploadPayload.asset.storageEpochDurationDays,
           originalUploader: account.address,
           royaltyBps: toNumber(blobRegisteredEvent?.royalty_bps, 500),
+          totalSupply: toNumber(blobRegisteredEvent?.total_supply, totalSupplyCount),
+          passesMinted: toNumber(blobRegisteredEvent?.passes_minted, 1),
           fields: {
             title: uploadPayload.asset.title,
             description: uploadPayload.asset.description,
@@ -442,9 +379,7 @@ export function UploadWorkflow() {
           },
         }),
       });
-
       const indexedPayload = (await indexResponse.json()) as IndexedListingResponse | { error?: string };
-
       if (!indexResponse.ok) {
         throw new Error(
           "error" in indexedPayload && indexedPayload.error
@@ -452,7 +387,6 @@ export function UploadWorkflow() {
             : "BlobPass could not index the on-chain listing.",
         );
       }
-
       setResponse(indexedPayload as IndexedListingResponse);
       setStatus("stored");
     } catch (uploadError) {
@@ -461,233 +395,377 @@ export function UploadWorkflow() {
     }
   }
 
+  const epochDays = Number.parseInt(storageEpochs, 10) * 14; // Walrus default — best-effort hint
+
   return (
-    <section className="mx-auto mt-14 max-w-5xl space-y-10">
-      <div className="grid gap-4 md:grid-cols-4">
+    <section className="mt-14 space-y-12">
+      {/* ───── Step indicator ───── */}
+      <div className="grid grid-cols-4 gap-px bg-[var(--ink-16)]">
         {flow.map((step, index) => {
-          const Icon = step.icon;
           const complete = index < activeStep || status === "stored";
           const active = index === activeStep && status !== "stored";
-
           return (
-            <div className="relative text-center" key={step.label}>
-              <div
-                className={`mx-auto grid h-12 w-12 place-items-center rounded-full border ${
-                  complete || active
-                    ? "border-cyan-300 bg-cyan-300/12 text-cyan-300"
-                    : "border-white/20 bg-black text-zinc-400"
-                }`}
-              >
-                <Icon size={22} />
+            <div className="bg-[var(--paper)] p-4" key={step.label}>
+              <div className="mono flex items-baseline justify-between text-[10px] tracking-[0.18em]">
+                <span style={{ color: active || complete ? "var(--signal-deep)" : "var(--ink-40)" }}>
+                  {step.num}
+                </span>
+                <span style={{ color: complete ? "var(--signal-deep)" : active ? "var(--ink)" : "var(--ink-40)" }}>
+                  {complete ? "DONE" : active ? "ACTIVE" : "—"}
+                </span>
               </div>
               <div
-                className={`mt-4 text-sm font-black uppercase ${
-                  complete || active ? "text-cyan-300" : "text-zinc-400"
-                }`}
+                className="display mt-2 text-[20px]"
+                style={{ color: active || complete ? "var(--ink)" : "var(--ink-40)" }}
               >
                 {step.label}
               </div>
+              <div
+                className="mt-3 h-[2px] w-full"
+                style={{
+                  background: complete
+                    ? "var(--signal)"
+                    : active
+                      ? "var(--ink)"
+                      : "var(--ink-16)",
+                }}
+              />
             </div>
           );
         })}
       </div>
 
-      <form className="panel rounded-xl" onSubmit={submit}>
-        <div className="flex items-center justify-between border-b border-white/10 p-8">
-          <div>
-            <h2 className="title text-2xl">Create Access Pass</h2>
-            <p className="mt-2 text-zinc-400">
-              Store the asset, publish the preview, and register a live marketplace listing.
-            </p>
-          </div>
-          <div className="grid h-12 w-12 place-items-center rounded-full border border-cyan-300/40 bg-cyan-300/10 text-cyan-300">
-            {activeStep + 1}
-          </div>
-        </div>
-
-        <div className="grid gap-8 p-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
-            <label className="grid min-h-[240px] cursor-pointer place-items-center rounded-xl border border-dashed border-white/18 bg-white/[0.02] p-8 text-center hover:border-cyan-300/60">
-              <input
-                className="sr-only"
-                onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
-              <div>
-                <div className="mx-auto mb-8 grid h-20 w-20 place-items-center rounded-full bg-cyan-300/12 text-cyan-300">
-                  <Upload size={34} />
-                </div>
-                <h3 className="title text-2xl">{assetFile ? assetFile.name : "Select Digital Asset"}</h3>
-                <p className="mx-auto mt-4 max-w-md leading-7 text-zinc-400">
-                  ZIP, PDF, MP4, datasets, code archives, prompt packs, and 3D models.
-                </p>
+      <form className="space-y-12" onSubmit={submit}>
+        {/* ───── 01 FILE ───── */}
+        <Section num="01" label="FILE" hint="Drop the asset. SHA-256 happens locally before anything leaves the browser.">
+          <label className="relative grid min-h-[280px] cursor-pointer place-items-center border border-dashed border-[var(--ink-40)] p-10 text-center transition-colors hover:border-[var(--signal)]">
+            <input
+              className="sr-only"
+              onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+            {/* corner marks */}
+            <span className="absolute left-0 top-0 h-4 w-4" style={{ borderTop: "2px solid var(--ink)", borderLeft: "2px solid var(--ink)" }} />
+            <span className="absolute right-0 top-0 h-4 w-4" style={{ borderTop: "2px solid var(--ink)", borderRight: "2px solid var(--ink)" }} />
+            <span className="absolute bottom-0 left-0 h-4 w-4" style={{ borderBottom: "2px solid var(--ink)", borderLeft: "2px solid var(--ink)" }} />
+            <span className="absolute bottom-0 right-0 h-4 w-4" style={{ borderBottom: "2px solid var(--ink)", borderRight: "2px solid var(--ink)" }} />
+            <div>
+              <div className="mono text-[10px] tracking-[0.24em] text-[var(--ink-40)]">
+                [ DROP / CLICK ]
               </div>
-            </label>
-
-            {assetFile ? (
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-5 text-sm text-zinc-300">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="font-black text-cyan-300">
-                    {hashStatus === "hashing"
-                      ? "Hashing File..."
-                      : duplicateMatch
-                        ? "Duplicate Blob Found"
-                        : hashStatus === "checked"
-                          ? "Unique Blob Candidate"
-                          : "Hash Pending"}
-                  </span>
-                  {fileHash ? <span className="mono text-xs text-zinc-500">{fileHash.slice(0, 18)}...</span> : null}
-                </div>
-                {duplicateMatch ? (
-                  <p className="mt-3 leading-6 text-zinc-400">
-                    Existing Walrus blob {duplicateMatch.blobLabel} was uploaded by{" "}
-                    {duplicateMatch.originalUploaderLabel}. This upload will mint an access pointer and route{" "}
-                    {duplicateMatch.royaltySui} SUI as a storage royalty.
-                  </p>
-                ) : (
-                  <p className="mt-3 leading-6 text-zinc-400">
-                    BlobPass checks SHA-256 locally before uploading, so duplicate assets can reuse existing storage.
-                  </p>
-                )}
+              <div className="display mt-3 break-all text-[clamp(20px,2.4vw,32px)]">
+                {assetFile ? assetFile.name : "Select digital asset"}
               </div>
-            ) : null}
+              <p className="mono mx-auto mt-4 max-w-md text-[12px] leading-7 text-[var(--ink-60)]">
+                ZIP · PDF · MP4 · datasets · code archives · prompt packs · 3D models.
+              </p>
+            </div>
+          </label>
 
-            <label className="grid gap-3 text-sm font-bold text-zinc-300">
-              Public Preview Image
+          {assetFile ? (
+            <div className="mt-6 grid gap-px bg-[var(--ink-16)] md:grid-cols-3">
+              <Tile label="HASH STATUS" value={
+                hashStatus === "hashing"
+                  ? "HASHING…"
+                  : duplicateMatch
+                    ? "DUPLICATE FOUND"
+                    : hashStatus === "checked"
+                      ? "UNIQUE"
+                      : "PENDING"
+              } accent={duplicateMatch ? "warn" : hashStatus === "checked" ? "signal" : "muted"} />
+              <Tile label="SHA-256" value={fileHash ? `${fileHash.slice(0, 14)}…` : "—"} mono />
+              <Tile label="SIZE" value={`${(assetFile.size / 1024).toFixed(0)} KB`} mono />
+            </div>
+          ) : null}
+
+          {duplicateMatch ? (
+            <div className="mt-4 border border-[var(--ink)] bg-[var(--ink)] p-4 text-[var(--paper)]">
+              <div className="mono mb-2 text-[10px] tracking-[0.18em]" style={{ color: "var(--signal)" }}>
+                [ DUPLICATE ─ ROYALTY MODE ]
+              </div>
+              <p className="mono text-[12px] leading-7" style={{ color: "var(--paper-60)" }}>
+                Existing Walrus blob {duplicateMatch.blobLabel} was uploaded by {duplicateMatch.originalUploaderLabel}.
+                This upload will mint an access pointer and route {duplicateMatch.royaltySui} SUI as a storage royalty.
+              </p>
+            </div>
+          ) : null}
+
+          {/* Preview image */}
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="label">PUBLIC PREVIEW IMAGE</div>
               <input
                 accept="image/*"
-                className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-zinc-300"
+                className="input-box mt-2"
                 onChange={(event) => setPreviewFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
-            </label>
-
-            <div className="flex gap-4 rounded-lg border border-white/10 bg-zinc-950 p-5 text-sm leading-6 text-zinc-400">
-              <ShieldCheck className="shrink-0 text-cyan-300" size={22} />
-              <p>
-                The raw asset is stored as a hidden blob. The marketplace receives only public metadata and preview data.
-              </p>
             </div>
+            <p className="mono text-[12px] leading-7 text-[var(--ink-60)]">
+              The raw asset is stored as a hidden blob. The marketplace receives only
+              the public metadata and preview image you provide here.
+            </p>
           </div>
+        </Section>
 
-          <div className="space-y-5">
-            <label className="grid gap-3 text-sm font-bold text-zinc-300">
-              Title
+        {/* ───── 02 METADATA ───── */}
+        <Section num="02" label="METADATA" hint="Title, description, and category appear on the public listing.">
+          <div className="grid gap-8">
+            <div>
+              <div className="label">TITLE</div>
               <input
-                className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
+                className="input-underline mt-1"
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Premium 3D Blender Pack"
                 value={title}
               />
-            </label>
-
-            <label className="grid gap-3 text-sm font-bold text-zinc-300">
-              Description
+            </div>
+            <div>
+              <div className="label">DESCRIPTION</div>
               <textarea
-                className="min-h-32 rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
+                className="input-box mt-2 min-h-32"
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="High-fidelity assets for rendering engines."
                 value={description}
               />
-            </label>
+            </div>
+            <div>
+              <div className="label">CATEGORY</div>
+              <select
+                className="input-box mt-2"
+                onChange={(event) => setCategory(event.target.value)}
+                value={category}
+              >
+                {["Digital Asset", "Datasets", "Video", "Source Code", "Documents", "AI Models"].map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Section>
 
-            <div className="grid gap-5 md:grid-cols-3">
-              <label className="grid gap-3 text-sm font-bold text-zinc-300">
-                Category
-                <select
-                  className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
-                  onChange={(event) => setCategory(event.target.value)}
-                  value={category}
-                >
-                  {["Digital Asset", "Datasets", "Video", "Source Code", "Documents", "AI Models"].map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-3 text-sm font-bold text-zinc-300">
-                Price
+        {/* ───── 03 PRICING ───── */}
+        <Section num="03" label="PRICING" hint="Set in SUI. Buyers pay once; the pass is theirs permanently.">
+          <div className="grid items-end gap-8 md:grid-cols-[1fr_auto]">
+            <div>
+              <div className="label">PRICE</div>
+              <div className="mt-2 flex items-baseline gap-3 border-b border-[var(--ink-40)] focus-within:border-[var(--signal)] focus-within:border-b-2">
                 <input
-                  className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
+                  className="display tabular-nums w-full bg-transparent text-[40px] leading-none outline-none"
                   min="0"
                   onChange={(event) => setPriceSui(event.target.value)}
                   step="0.000000001"
                   type="number"
                   value={priceSui}
                 />
-              </label>
+                <span className="mono pb-2 text-[14px] tracking-[0.18em] text-[var(--ink-40)]">
+                  SUI
+                </span>
+              </div>
+            </div>
+            <div className="mono text-[11px] leading-7 text-[var(--ink-60)]">
+              ≈ {(Number.parseFloat(priceSui) * 1).toFixed(4)} SUI / pass
+              <br />
+              100% to seller wallet
+            </div>
+          </div>
+        </Section>
 
-              <label className="grid gap-3 text-sm font-bold text-zinc-300">
-                Epochs
+        {/* ───── 04 STORAGE ───── */}
+        {/* TODO(epochs-preset): convert to 3 preset cards (Short / Standard / Extended) per user request */}
+        <Section
+          num="04"
+          label="STORAGE"
+          hint="How long the blob is funded on Walrus before it must be topped up."
+        >
+          <div className="grid items-end gap-8 md:grid-cols-[1fr_1fr]">
+            <div>
+              <div className="label">EPOCHS</div>
+              <div className="mt-2 flex items-baseline gap-3 border-b border-[var(--ink-40)] focus-within:border-[var(--signal)] focus-within:border-b-2">
                 <input
-                  className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-white"
+                  className="display tabular-nums w-full bg-transparent text-[40px] leading-none outline-none"
                   min="1"
                   onChange={(event) => setStorageEpochs(event.target.value)}
                   step="1"
                   type="number"
                   value={storageEpochs}
                 />
-              </label>
-            </div>
-
-            <button
-              className="button-primary min-h-14 w-full text-base"
-              disabled={
-                status === "hashing" ||
-                hashStatus === "hashing" ||
-                status === "uploading" ||
-                status === "signing" ||
-                status === "confirming"
-              }
-              type="submit"
-            >
-              {status === "hashing" || hashStatus === "hashing"
-                ? "Checking Registry..."
-                : status === "uploading"
-                ? "Uploading..."
-                : status === "signing"
-                  ? "Awaiting Wallet Signature..."
-                  : status === "confirming"
-                    ? "Confirming On-Chain..."
-                    : duplicateMatch
-                      ? "Mint Access Pointer"
-                      : "Store & List Asset"}
-              <ArrowRight size={20} />
-            </button>
-
-            {!account?.address ? (
-              <p className="text-sm font-bold text-amber-300">
-                Connect a Sui wallet to stamp the seller address into the upload payload.
-              </p>
-            ) : null}
-
-            {error ? <p className="text-sm font-bold text-red-300">{error}</p> : null}
-
-            {response ? (
-              <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/8 p-5 text-sm text-zinc-300">
-                <div className="mb-3 font-black text-cyan-300">Access Live</div>
-                <div className="grid gap-2">
-                  <span>Pass: {response.pass.id}</span>
-                  <span>Listing: {response.pass.listingId}</span>
-                  <span>Hidden blob: {response.pass.content.fields.walrus_blob_id}</span>
-                  <span>Transaction: {txDigest || "pending"}</span>
-                </div>
-                <p className="mt-4 leading-6 text-zinc-300">
-                  The asset lifecycle is recorded, the access object is minted on Sui, and the local mirror has been updated with the on-chain IDs.
-                </p>
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <Link className="button-primary min-h-11 flex-1 justify-center" href="/marketplace">
-                    View Marketplace
-                  </Link>
-                  <Link className="button-secondary min-h-11 flex-1 justify-center" href="/library">
-                    Open My Library
-                  </Link>
-                </div>
+                <span className="mono pb-2 text-[14px] tracking-[0.18em] text-[var(--ink-40)]">
+                  EPOCHS
+                </span>
               </div>
-            ) : null}
+            </div>
+            <div className="mono text-[11px] leading-7 text-[var(--ink-60)]">
+              ≈ {epochDays || 0} days of guaranteed storage
+              <br />
+              Can be extended any time via /library
+            </div>
           </div>
+        </Section>
+
+        {/* ───── 05 EDITIONS ───── */}
+        <Section
+          num="05"
+          label="EDITIONS"
+          hint="How many copies of the access pass can exist. 1 = unique."
+        >
+          <div className="grid items-end gap-8 md:grid-cols-[1fr_1fr]">
+            <div>
+              <div className="label">TOTAL SUPPLY</div>
+              <div className="mt-2 flex items-baseline gap-3 border-b border-[var(--ink-40)] focus-within:border-[var(--signal)] focus-within:border-b-2">
+                <input
+                  className="display tabular-nums w-full bg-transparent text-[40px] leading-none outline-none"
+                  min="1"
+                  onChange={(event) => {
+                    setEditionSize(event.target.value);
+                    setEditionAutoDetected(false);
+                  }}
+                  required
+                  step="1"
+                  type="number"
+                  value={editionSize}
+                />
+                <span className="mono pb-2 text-[14px] tracking-[0.18em] text-[var(--ink-40)]">
+                  EDITIONS
+                </span>
+              </div>
+            </div>
+            <div className="mono text-[11px] leading-7 text-[var(--ink-60)]">
+              {editionAutoDetected
+                ? `Auto-counted ${editionSize} entries from the ZIP. Edit if needed.`
+                : "Each edition is an independent pass that can be transferred."}
+            </div>
+          </div>
+        </Section>
+
+        {/* ───── SUBMIT ───── */}
+        <div className="ascii-rule" />
+        <div className="grid gap-4">
+          <button
+            className="button-primary w-full"
+            style={{ minHeight: 56, fontSize: 14, letterSpacing: "0.18em" }}
+            disabled={
+              status === "hashing" ||
+              hashStatus === "hashing" ||
+              status === "uploading" ||
+              status === "signing" ||
+              status === "confirming"
+            }
+            type="submit"
+          >
+            {status === "hashing" || hashStatus === "hashing"
+              ? "[ CHECKING REGISTRY... ]"
+              : status === "uploading"
+                ? "[ UPLOADING TO WALRUS... ]"
+                : status === "signing"
+                  ? "[ AWAITING WALLET SIGNATURE... ]"
+                  : status === "confirming"
+                    ? "[ CONFIRMING ON-CHAIN... ]"
+                    : duplicateMatch
+                      ? "[ MINT ACCESS POINTER ]"
+                      : "[ STORE & LIST ASSET ]"}
+          </button>
+
+          {!account?.address ? (
+            <p className="mono text-[12px] tracking-[0.04em]" style={{ color: "#d4a853" }}>
+              ⚠ Connect a Sui wallet to stamp the seller address into the upload payload.
+            </p>
+          ) : null}
+
+          {error ? (
+            <p className="mono text-[12px]" style={{ color: "#c0392b" }}>
+              ✗ {error}
+            </p>
+          ) : null}
+
+          {response ? (
+            <div className="border border-[var(--signal)] bg-[var(--paper)] p-6">
+              <div className="mono mb-4 text-[11px] tracking-[0.18em]" style={{ color: "var(--signal-deep)" }}>
+                [ ACCESS LIVE ─ TX BROADCAST ]
+              </div>
+              <dl className="mono grid gap-2 text-[12px]">
+                <Row k="PASS" v={response.pass.id} />
+                <Row k="LISTING" v={response.pass.listingId} />
+                <Row k="BLOB" v={response.pass.content.fields.walrus_blob_id} />
+                <Row k="TX" v={txDigest || "pending"} />
+              </dl>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Link className="button-primary flex-1 justify-center" href="/marketplace">
+                  [ VIEW MARKETPLACE ]
+                </Link>
+                <Link className="button-secondary flex-1 justify-center" href="/library">
+                  [ OPEN LIBRARY ]
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </div>
       </form>
     </section>
+  );
+}
+
+function Section({
+  num,
+  label,
+  hint,
+  children,
+}: {
+  num: string;
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-[var(--ink-40)] pt-6">
+      <div className="mb-6 grid grid-cols-1 items-baseline gap-3 md:grid-cols-[auto_1fr_auto] md:gap-6">
+        <span className="display text-[40px] leading-none">{num}.</span>
+        <div>
+          <h3 className="mono text-[14px] font-medium tracking-[0.18em]">{label}</h3>
+          <p className="mono mt-1 text-[12px] leading-6 text-[var(--ink-60)]">{hint}</p>
+        </div>
+        <span className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)] md:text-right">
+          [ {label} ]
+        </span>
+      </div>
+      <div className="pl-0 md:pl-[64px]">{children}</div>
+    </section>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  mono,
+  accent,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  accent?: "signal" | "warn" | "muted";
+}) {
+  const color =
+    accent === "signal" ? "var(--signal-deep)" : accent === "warn" ? "#d4a853" : "var(--ink)";
+  return (
+    <div className="bg-[var(--paper)] p-4">
+      <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
+        {label}
+      </div>
+      <div
+        className={`mt-2 ${mono ? "mono" : "display"} text-[14px] tabular-nums`}
+        style={{ color }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="grid grid-cols-[80px_1fr] items-baseline gap-4 border-b border-[var(--ink-08)] pb-1">
+      <dt className="text-[10px] tracking-[0.18em] text-[var(--ink-40)]">{k}</dt>
+      <dd className="break-all text-[12px]">{v}</dd>
+    </div>
   );
 }

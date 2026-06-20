@@ -32,6 +32,8 @@ export type BlobRegisteredEvent = {
   storage_start_epoch?: string | number;
   storage_end_epoch?: string | number;
   royalty_bps?: string | number;
+  total_supply?: string | number;
+  passes_minted?: string | number;
 };
 
 export type AccessPointerMintedEvent = {
@@ -145,6 +147,7 @@ export function buildCreateRegisteredListingTransaction(input: {
   walrusBlobId: string;
   fileHashBytes: number[];
   storageEpochs: number;
+  totalSupply: number;
   priceMist: string;
 }) {
   const { packageId, ecosystemId, registryId } = assertRegistryConfig();
@@ -156,6 +159,8 @@ export function buildCreateRegisteredListingTransaction(input: {
     getEcosystemInitialSharedVersion(),
     true,
   );
+
+  const totalSupply = Math.max(1, Math.floor(input.totalSupply));
 
   tx.moveCall({
     target: `${packageId}::access_pass::create_registered_listing`,
@@ -170,6 +175,7 @@ export function buildCreateRegisteredListingTransaction(input: {
       tx.pure.string(input.walrusBlobId),
       tx.pure.vector("u8", input.fileHashBytes),
       tx.pure.u64(String(input.storageEpochs)),
+      tx.pure.u64(String(totalSupply)),
       tx.pure.u64(input.priceMist),
     ],
   });

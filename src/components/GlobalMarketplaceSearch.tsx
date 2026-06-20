@@ -1,6 +1,5 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent } from "react";
 
@@ -34,19 +33,22 @@ export function GlobalMarketplaceSearch() {
 
   return (
     <form
-      className="ml-auto hidden h-11 min-w-[280px] items-center gap-3 rounded-lg border border-white/15 bg-zinc-950 px-4 text-zinc-400 transition hover:border-cyan-300/40 focus-within:border-cyan-300/60 focus-within:text-white md:flex"
+      className="mono ml-auto hidden h-9 min-w-[260px] items-center gap-2 border border-[var(--ink-40)] px-3 text-[12px] transition focus-within:border-[var(--signal)] md:flex"
       onSubmit={submitSearch}
     >
-      <Search size={18} />
+      <span className="text-[var(--signal-deep)]">&gt;</span>
       <input
-        className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+        className="w-full bg-transparent text-[13px] tracking-[0.02em] text-[var(--ink)] outline-none placeholder:text-[var(--ink-40)]"
         defaultValue={query}
         key={inputKey}
         name="q"
-        placeholder="Search marketplace..."
+        placeholder="search marketplace_"
       />
-      <button className="text-cyan-300 transition hover:text-cyan-200" type="submit">
-        <Search size={16} />
+      <button
+        className="border-l border-[var(--ink-16)] pl-2 text-[11px] tracking-[0.16em] text-[var(--ink-40)] hover:text-[var(--signal-deep)]"
+        type="submit"
+      >
+        ENTER
       </button>
     </form>
   );
