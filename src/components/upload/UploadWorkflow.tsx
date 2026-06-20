@@ -390,6 +390,11 @@ export function UploadWorkflow() {
         );
       }
       const uploadPayload = payload as UploadResponse;
+      if (uploadPayload.source !== "walrus") {
+        throw new Error(
+          "Upload only persisted to this machine's local disk — the Walrus publisher returned no blob id, so the listing would be unreachable in production. Check that WALRUS_PUBLISHER_URL / WALRUS_AGGREGATOR_URL are set and the publisher is online, then retry.",
+        );
+      }
       const priceMist = uploadPayload.asset.priceMist || suiToMist(priceSui);
       const storageEpochCount = Math.max(1, Number.parseInt(storageEpochs, 10) || uploadPayload.asset.storageEpochs || 5);
       const totalSupplyCount = Math.max(1, Number.parseInt(editionSize, 10) || 1);

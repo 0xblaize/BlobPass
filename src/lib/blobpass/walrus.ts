@@ -165,57 +165,61 @@ function walrusBlobUrl(blobId: string) {
 export async function storeWalrusBlob({
   file,
   visibility,
-  origin,
+  origin: _origin,
   storageEpochs: requestedStorageEpochs,
 }: StoreWalrusBlobInput): Promise<UploadReceipt> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const contentType = contentTypeFor(file);
   const publisher = getWalrusPublisherUrl();
+  const isProduction = process.env.NODE_ENV === "production";
   const storageEpochs =
     Number.isFinite(requestedStorageEpochs) && requestedStorageEpochs && requestedStorageEpochs > 0
       ? requestedStorageEpochs
       : getStorageEpochs();
 
   if (publisher) {
-    try {
-      const url = new URL("/v1/blobs", publisher);
-      url.searchParams.set("epochs", String(storageEpochs));
+    const url = new URL("/v1/blobs", publisher);
+    url.searchParams.set("epochs", String(storageEpochs));
 
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": contentType,
-        },
-        body: Buffer.from(bytes),
-      });
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: Buffer.from(bytes),
+    });
 
-      if (!response.ok) {
-        throw new Error(`Walrus upload failed with HTTP ${response.status}`);
-      }
-
-      const payload: unknown = await response.json();
-      const blobId = extractWalrusBlobId(payload);
-      const blobObjectId = extractWalrusBlobObjectId(payload);
-
-      if (!blobId) {
-        throw new Error("Walrus upload succeeded without a blob id");
-      }
-
-      return {
-        blobId,
-        blobObjectId,
-        url: walrusBlobUrl(blobId),
-        filename: file.name,
-        contentType,
-        size: file.size,
-        visibility,
-        source: "walrus",
-        storageEpochs,
-        storageEndEpoch: extractWalrusStorageEndEpoch(payload),
-      };
-    } catch {
-      // Fall through to local persistence so the app remains usable offline.
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(
+        `Walrus publisher rejected upload (HTTP ${response.status})${detail ? `: ${detail.slice(0, 200)}` : ""}`,
+      );
     }
+
+    const payload: unknown = await response.json();
+    const blobId = extractWalrusBlobId(payload);
+    const blobObjectId = extractWalrusBlobObjectId(payload);
+
+    if (!blobId) {
+      throw new Error("Walrus publisher returned no blob id");
+    }
+
+    return {
+      blobId,
+      blobObjectId,
+      url: walrusBlobUrl(blobId) || `/api/walrus/${encodeURIComponent(blobId)}`,
+      filename: file.name,
+      contentType,
+      size: file.size,
+      visibility,
+      source: "walrus",
+      storageEpochs,
+      storageEndEpoch: extractWalrusStorageEndEpoch(payload),
+    };
+  }
+
+  if (isProduction) {
+    throw new Error(
+      "Walrus publisher is not configured. Set WALRUS_PUBLISHER_URL (and WALRUS_AGGREGATOR_URL) before uploading in production — local-disk fallback would not be reachable across replicas.",
+    );
   }
 
   const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
