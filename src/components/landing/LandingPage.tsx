@@ -339,9 +339,9 @@ async function MarketplacePreview() {
 
   return (
     <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-4">
-      {listings.slice(0, 4).map((item) => (
+      {listings.slice(0, 4).map((item, index) => (
         <div className="bg-[var(--paper)]" key={item.passId}>
-          <ListingCard item={item} />
+          <ListingCard item={item} priority={index < 2} />
         </div>
       ))}
     </div>

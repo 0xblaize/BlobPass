@@ -225,9 +225,9 @@ export function MarketplaceCatalog({
         </div>
         {filteredListings.length > 0 ? (
           <div className="grid grid-cols-1 gap-px bg-[var(--ink-16)] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {filteredListings.map((item) => (
+            {filteredListings.map((item, index) => (
               <div className="bg-[var(--paper)]" key={item.passId}>
-                <ListingCard item={item} />
+                <ListingCard item={item} priority={index < 3} />
               </div>
             ))}
           </div>

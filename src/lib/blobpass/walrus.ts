@@ -228,7 +228,7 @@ export async function storeWalrusBlob({
 
   return {
     blobId,
-    url: `${origin ?? ""}/api/walrus/${encodeURIComponent(blobId)}`,
+    url: `/api/walrus/${encodeURIComponent(blobId)}`,
     filename: file.name,
     contentType,
     size: file.size,

@@ -6,6 +6,7 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import { useState } from "react";
 import {
   buildBuyListingTransaction,
@@ -39,21 +40,45 @@ function VerifiedBadge({ label = "VERIFIED" }: { label?: string }) {
   );
 }
 
+function normalizePreviewUrl(raw: string) {
+  if (!raw) return "";
+  if (raw.startsWith("/")) return raw;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.startsWith("/api/walrus/")) {
+      return parsed.pathname + parsed.search;
+    }
+    const walrusMatch = parsed.pathname.match(/\/v1\/blobs\/([^/]+)$/);
+    if (walrusMatch) {
+      return `/api/walrus/${walrusMatch[1]}`;
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
 function PreviewImage({
   item,
   heightClass,
+  priority,
 }: {
   item: Pick<MarketplaceListing | LibraryAssetView, "previewImageUrl" | "gradient" | "category">;
   heightClass: string;
+  priority?: boolean;
 }) {
+  const src = normalizePreviewUrl(item.previewImageUrl);
   return (
     <div className={`asset-image relative overflow-hidden ${heightClass}`}>
-      {item.previewImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+      {src ? (
+        <Image
           alt=""
-          className="absolute inset-0 z-[1] h-full w-full object-cover"
-          src={item.previewImageUrl}
+          className="absolute inset-0 z-[1] object-cover"
+          fill
+          priority={priority}
+          loading={priority ? undefined : "lazy"}
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+          src={src}
         />
       ) : null}
       <span className="absolute right-2 top-2 z-[2] mono text-[10px] tracking-[0.16em] border border-[var(--ink)] bg-[var(--paper)] px-1.5 py-0.5 text-[var(--ink)]">
@@ -252,14 +277,14 @@ function EditionChip({
   );
 }
 
-export function ListingCard({ item }: { item: MarketplaceListing }) {
+export function ListingCard({ item, priority = false }: { item: MarketplaceListing; priority?: boolean }) {
   const { buy, state, account, errorMessage } = usePurchase(item);
   const buyDisabled =
     state === "buying" || state === "owned" || !account?.address || item.soldOut;
 
   return (
     <article className="surface surface-interactive flex flex-col bg-[var(--paper)]">
-      <PreviewImage heightClass="h-48" item={item} />
+      <PreviewImage heightClass="h-48" item={item} priority={priority} />
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <h3 className="mono text-[15px] font-medium leading-tight tracking-[0.02em]">
@@ -322,7 +347,7 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
   return (
     <article className="surface surface-interactive grid gap-0 bg-[var(--paper)] md:grid-cols-[280px_1fr]">
-      <PreviewImage heightClass="min-h-64 md:min-h-full" item={item} />
+      <PreviewImage heightClass="min-h-64 md:min-h-full" item={item} priority />
       <div className="flex flex-col justify-between gap-6 p-7">
         <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
@@ -337,7 +362,7 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
           <p className="mono text-[13px] leading-7 text-[var(--ink-60)]">
             {item.description}
           </p>
-          <div className="grid grid-cols-3 gap-4 border-y border-[var(--ink-16)] py-4">
+          <div className="grid grid-cols-3 divide-x divide-[var(--ink-16)] border-y border-[var(--ink-16)] py-4">
             <Stat label="SELLER" value={`@${item.seller.replace(/^@/, "")}`} />
             <Stat label="SIZE" value={item.size} />
             <Stat label="EDITIONS" value={`${item.editionsMinted}/${item.editionTotal}`} />
@@ -373,11 +398,11 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0 px-4 first:pl-0 last:pr-0">
       <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
         {label}
       </div>
-      <div className="mono mt-1 text-[13px] tracking-[0.02em]">{value}</div>
+      <div className="mono mt-1 truncate text-[13px] tracking-[0.02em]">{value}</div>
     </div>
   );
 }
