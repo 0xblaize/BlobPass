@@ -83,7 +83,7 @@ export function MarketplaceCatalog({
   return (
     <>
       {/* ─────── HEADER: asymmetric 7/5 ─────── */}
-      <section className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[7fr_5fr] lg:gap-16">
+      <section className="grid grid-cols-1 items-end gap-10 md:grid-cols-[8fr_4fr] md:gap-12 lg:grid-cols-[7fr_5fr] lg:gap-16">
         <div>
           <div className="section-num mb-3">01 — CATALOG</div>
           <h1 className="display text-[clamp(36px,5vw,64px)]">
@@ -133,15 +133,15 @@ export function MarketplaceCatalog({
 
       {/* ─────── CATEGORY TABS ─────── */}
       <div
-        className="mono mt-16 flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-[var(--ink-16)] py-4 text-[12px] tracking-[0.18em]"
+        className="mono mt-16 flex flex-wrap items-center gap-x-3 gap-y-3 border-y border-[var(--ink-16)] py-4 text-[12px] tracking-[0.18em] md:gap-x-6"
         id="catalog"
       >
         <span className="text-[var(--signal-deep)]">&gt;</span>
         {categories.map((item, i) => {
           const active = category === item;
           return (
-            <div className="flex items-center gap-6" key={item}>
-              {i > 0 && <span className="text-[var(--ink-40)]">·</span>}
+            <div className="flex items-center gap-3 md:gap-6" key={item}>
+              {i > 0 && <span className="hidden text-[var(--ink-40)] sm:inline">·</span>}
               <button
                 className={
                   active

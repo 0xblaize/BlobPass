@@ -3,9 +3,21 @@
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LibraryCard } from "@/components/cards";
 import type { LibraryAssetView, LibraryStats } from "@/lib/blobpass/types";
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isDesktop;
+}
 
 type LibraryResponse = {
   ok: true;
@@ -26,7 +38,10 @@ export function LibraryGrid({
 }) {
   const account = useCurrentAccount();
   const [tab, setTab] = useState<TabKey>("All Assets");
-  const [view, setView] = useState<ViewMode>("table");
+  const [userView, setUserView] = useState<ViewMode | null>(null);
+  const isDesktop = useIsDesktop();
+  const view: ViewMode = userView ?? (isDesktop ? "table" : "grid");
+  const setView = (next: ViewMode) => setUserView(next);
 
   const libraryQuery = useQuery<LibraryResponse>({
     queryKey: ["library", account?.address ?? "disconnected"],

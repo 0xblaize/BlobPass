@@ -11,7 +11,7 @@ export default async function LibraryPage() {
     <>
       <Header active="library" />
       <main className="shell pb-24 pt-16">
-        <section className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[7fr_5fr]">
+        <section className="grid grid-cols-1 items-end gap-10 md:grid-cols-[8fr_4fr] md:gap-12 lg:grid-cols-[7fr_5fr]">
           <div>
             <div className="section-num mb-3">03 — LEDGER</div>
             <h1 className="display text-[clamp(36px,5vw,64px)]">

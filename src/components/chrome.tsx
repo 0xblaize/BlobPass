@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ConnectWalletButton } from "./ConnectWalletButton";
 import { GlobalMarketplaceSearch } from "./GlobalMarketplaceSearch";
+import { MobileMenu } from "./MobileMenu";
 
 type NavProps = {
   active?: "marketplace" | "upload" | "library";
@@ -42,7 +43,7 @@ export function Header({ active, landing = false }: NavProps) {
   if (landing) {
     return (
       <header className="zone-ink relative z-20 border-b border-[var(--paper-16)]">
-        <div className="shell flex h-14 items-center justify-between gap-6">
+        <div className="shell flex h-14 items-center justify-between gap-3 md:gap-6">
           <Logo inverted />
           <nav className="hide-mobile mono flex items-center gap-5 text-[12px] tracking-[0.18em] text-[var(--paper-60)]">
             <a className="hover:text-[var(--paper)]" href="#how">
@@ -62,6 +63,7 @@ export function Header({ active, landing = false }: NavProps) {
               [ UPLOAD ]
             </Link>
             <ConnectWalletButton />
+            <MobileMenu variant="landing" />
           </div>
         </div>
       </header>
@@ -70,7 +72,7 @@ export function Header({ active, landing = false }: NavProps) {
 
   return (
     <header className="zone-paper sticky top-0 z-50 border-b border-[var(--ink-16)] backdrop-blur">
-      <div className="shell flex h-14 items-center gap-6">
+      <div className="shell flex h-14 items-center gap-3 md:gap-6">
         <Logo />
         <nav className="hide-mobile mono flex items-center gap-4 text-[12px] tracking-[0.18em]">
           {nav.map((item, i) => {
@@ -102,7 +104,10 @@ export function Header({ active, landing = false }: NavProps) {
         >
           <GlobalMarketplaceSearch />
         </Suspense>
-        <ConnectWalletButton />
+        <div className="ml-auto flex items-center gap-3 md:ml-0 md:gap-6">
+          <ConnectWalletButton />
+          <MobileMenu variant="app" active={active} />
+        </div>
       </div>
     </header>
   );

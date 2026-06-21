@@ -540,7 +540,7 @@ export function UploadWorkflow() {
       <form className="space-y-12" onSubmit={submit}>
         {/* ───── 01 FILE ───── */}
         <Section num="01" label="FILE" hint="Drop the asset. SHA-256 happens locally before anything leaves the browser.">
-          <label className="relative grid min-h-[280px] cursor-pointer place-items-center border border-dashed border-[var(--ink-40)] p-10 text-center transition-colors hover:border-[var(--signal)]">
+          <label className="relative grid min-h-[180px] cursor-pointer place-items-center border border-dashed border-[var(--ink-40)] p-6 text-center transition-colors hover:border-[var(--signal)] md:min-h-[280px] md:p-10">
             <input
               className="sr-only"
               onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)}
@@ -555,7 +555,7 @@ export function UploadWorkflow() {
               <div className="mono text-[10px] tracking-[0.24em] text-[var(--ink-40)]">
                 [ DROP / CLICK ]
               </div>
-              <div className="display mt-3 break-all text-[clamp(20px,2.4vw,32px)]">
+              <div className="display mt-3 max-w-full truncate text-[clamp(18px,2.4vw,32px)]">
                 {assetFile ? assetFile.name : "Select digital asset"}
               </div>
               <p className="mono mx-auto mt-4 max-w-md text-[12px] leading-7 text-[var(--ink-60)]">
@@ -868,7 +868,7 @@ function Section({
   return (
     <section className="border-t border-[var(--ink-40)] pt-6">
       <div className="mb-6 grid grid-cols-1 items-baseline gap-3 md:grid-cols-[auto_1fr_auto] md:gap-6">
-        <span className="display text-[40px] leading-none">{num}.</span>
+        <span className="display text-[28px] leading-none md:text-[40px]">{num}.</span>
         <div>
           <h3 className="mono text-[14px] font-medium tracking-[0.18em]">{label}</h3>
           <p className="mono mt-1 text-[12px] leading-6 text-[var(--ink-60)]">{hint}</p>

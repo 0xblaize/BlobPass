@@ -558,7 +558,7 @@ input[type="number"] {
 
 @media (max-width: 760px) {
   .shell {
-    width: min(100% - 22px, 1280px);
+    width: min(100% - 24px, 1280px);
   }
 
   .shell-grid {
@@ -568,6 +568,10 @@ input[type="number"] {
 
   .hide-mobile {
     display: none !important;
+  }
+
+  .display {
+    letter-spacing: -0.02em;
   }
 }
 

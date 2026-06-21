@@ -358,7 +358,7 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
             {item.verified ? <VerifiedBadge /> : null}
             <EditionChip item={item} />
           </div>
-          <h2 className="display text-[clamp(26px,3vw,40px)]">{item.title}</h2>
+          <h2 className="display text-[clamp(20px,5vw,40px)]">{item.title}</h2>
           <p className="mono text-[13px] leading-7 text-[var(--ink-60)]">
             {item.description}
           </p>
@@ -398,7 +398,7 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 px-4 first:pl-0 last:pr-0">
+    <div className="min-w-0 px-3 first:pl-0 last:pr-0">
       <div className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)]">
         {label}
       </div>

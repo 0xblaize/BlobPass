@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import { Geist } from "next/font/google";
 import "@mysten/dapp-kit/dist/index.css";
@@ -60,6 +60,12 @@ export const metadata: Metadata = {
   // Icons are auto-wired by Next.js from src/app/icon.tsx (favicon)
   // and src/app/apple-icon.tsx (apple touch icon) — both code-generated
   // to match the site's brutalist design system. No manual config needed.
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({

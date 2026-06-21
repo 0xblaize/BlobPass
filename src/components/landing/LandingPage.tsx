@@ -16,7 +16,7 @@ export function LandingPage() {
       <div className="zone-ink relative overflow-hidden">
         <Header landing />
         <main className="shell relative">
-          <section className="flex flex-col items-stretch gap-10 pb-24 pt-8 md:flex-row md:items-center md:gap-12 md:pb-32 md:pt-12">
+          <section className="flex flex-col items-stretch gap-8 pb-16 pt-6 md:flex-row md:items-center md:gap-12 md:pb-32 md:pt-12">
             {/* LEFT: typographic mass (≈ 7/12) */}
             <div className="min-w-0 md:basis-[58%]">
               <div className="mb-8 flex items-center gap-3">
@@ -25,7 +25,7 @@ export function LandingPage() {
               </div>
 
               <h1
-                className="display text-[clamp(40px,6vw,80px)]"
+                className="display text-[clamp(32px,9vw,80px)]"
                 style={{ color: "var(--paper)" }}
               >
                 Files,
@@ -82,10 +82,9 @@ export function LandingPage() {
 
                 {/* the crate */}
                 <div
-                  className="relative w-full"
+                  className="relative w-full md:!min-h-[380px]"
                   style={{
                     aspectRatio: "1 / 1",
-                    minHeight: 380,
                     backgroundColor: "#06080a",
                     border: "1px solid rgba(250,247,240,0.55)",
                     boxShadow:
@@ -169,7 +168,7 @@ export function LandingPage() {
           <div className="mb-16 grid grid-cols-1 items-end gap-8 md:grid-cols-[8fr_4fr]">
             <div>
               <div className="section-num mb-2">02 — TRADE</div>
-              <h2 className="display text-[clamp(40px,6vw,80px)]">
+              <h2 className="display text-[clamp(28px,8vw,80px)]">
                 What&apos;s live
                 <br />
                 right now.
@@ -226,7 +225,7 @@ export function LandingPage() {
         <div className="shell grid grid-cols-1 items-stretch gap-10 py-24 md:grid-cols-[7fr_5fr] md:gap-16">
           <div>
             <div className="section-num mb-3">05 — ENTRY POINT</div>
-            <h2 className="display text-[clamp(32px,5vw,64px)]" style={{ color: "var(--paper)" }}>
+            <h2 className="display text-[clamp(28px,7vw,64px)]" style={{ color: "var(--paper)" }}>
               Start selling files
               <br />
               <span style={{ color: "var(--signal)" }}>on Walrus today.</span>
