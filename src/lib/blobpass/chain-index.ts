@@ -20,6 +20,27 @@ function getPackageId() {
   return process.env.NEXT_PUBLIC_BLOBPASS_PACKAGE_ID || "";
 }
 
+function getLegacyPackageIds(): string[] {
+  const raw = process.env.NEXT_PUBLIC_BLOBPASS_LEGACY_PACKAGE_IDS || "";
+  return raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+}
+
+function getAllPackageIds(): string[] {
+  const current = getPackageId();
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const id of [current, ...getLegacyPackageIds()]) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+  return result;
+}
+
 function getRpcUrl() {
   return (
     process.env.TATUM_SUI_RPC_URL ||
@@ -106,8 +127,10 @@ function isoFromTimestampMs(ms: unknown, fallbackIso: string) {
   return fallbackIso;
 }
 
-async function queryEventsPage(cursor: { txDigest?: string; eventSeq?: string } | null) {
-  const packageId = getPackageId();
+async function queryEventsPage(
+  packageId: string,
+  cursor: { txDigest?: string; eventSeq?: string } | null,
+) {
   if (!packageId) {
     return { events: [] as SuiEvent[], nextCursor: null, hasNextPage: false };
   }
@@ -336,25 +359,31 @@ function foldEvent(
 }
 
 async function fetchAllPasses(): Promise<DataAccessPassObject[]> {
-  if (!getPackageId()) {
+  const packageIds = getAllPackageIds();
+  if (packageIds.length === 0) {
     return [];
   }
 
   const passes = new Map<string, DataAccessPassObject>();
   const byFileHash = new Map<string, string>();
   const byListingId = new Map<string, string>();
-
-  let cursor: { txDigest?: string; eventSeq?: string } | null = null;
+  const seenEventKeys = new Set<string>();
   let sequence = 0;
 
-  for (let page = 0; page < PAGE_LIMIT; page += 1) {
-    const { events, nextCursor, hasNextPage } = await queryEventsPage(cursor);
-    for (const event of events) {
-      foldEvent(passes, byFileHash, byListingId, event, sequence);
-      sequence += 1;
+  for (const packageId of packageIds) {
+    let cursor: { txDigest?: string; eventSeq?: string } | null = null;
+    for (let page = 0; page < PAGE_LIMIT; page += 1) {
+      const { events, nextCursor, hasNextPage } = await queryEventsPage(packageId, cursor);
+      for (const event of events) {
+        const key = `${event.id?.txDigest ?? ""}:${event.id?.eventSeq ?? ""}`;
+        if (key !== ":" && seenEventKeys.has(key)) continue;
+        if (key !== ":") seenEventKeys.add(key);
+        foldEvent(passes, byFileHash, byListingId, event, sequence);
+        sequence += 1;
+      }
+      if (!hasNextPage || !nextCursor) break;
+      cursor = nextCursor;
     }
-    if (!hasNextPage || !nextCursor) break;
-    cursor = nextCursor;
   }
 
   return Array.from(passes.values())
@@ -363,7 +392,7 @@ async function fetchAllPasses(): Promise<DataAccessPassObject[]> {
 }
 
 export async function loadChainPasses(): Promise<DataAccessPassObject[]> {
-  if (!getPackageId()) {
+  if (getAllPackageIds().length === 0) {
     return [];
   }
 
