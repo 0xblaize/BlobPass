@@ -104,6 +104,7 @@ export type LibraryAssetView = {
   listingInitialSharedVersion?: string;
   blobObjectId?: string;
   title: string;
+  description: string;
   category: string;
   status: "Owned" | "Your Listing" | "Locked";
   action: string;
@@ -116,6 +117,11 @@ export type LibraryAssetView = {
   previewImageUrl: string;
   source: BlobPassRuntimeSource;
   fileHash: string;
+  fileSize: string;
+  fileType: string;
+  assetFilename: string;
+  walrusBlobId: string;
+  originalUploader: string;
   storageStartEpoch: number;
   storageEndEpoch: number;
   storageEpochDurationDays: number;

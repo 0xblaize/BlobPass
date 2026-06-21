@@ -7,11 +7,16 @@ import {
 } from "@mysten/dapp-kit";
 import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import {
   buildBuyListingTransaction,
   buildDelistListingTransaction,
+  buildListOwnedPassTransaction,
   buildStorageTopUpTransaction,
+  getCreatedListingChange,
+  getInitialSharedVersionFromChange,
+  getListingCreatedEvent,
   getListingDelistedEvent,
   getListingPurchasedEvent,
   getTransferredPassChange,
@@ -262,6 +267,120 @@ function useDelist(asset: LibraryAssetView) {
   return { delist, state, errorMessage };
 }
 
+function useListOwned(asset: LibraryAssetView) {
+  const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const queryClient = useQueryClient();
+  const signAndExecute = useSignAndExecuteTransaction();
+  const [state, setState] = useState<"idle" | "signing" | "confirming" | "listed" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function list(priceSui: string) {
+    if (!account?.address) {
+      setState("error");
+      setErrorMessage("Connect the pass-holding wallet before listing.");
+      return;
+    }
+
+    const trimmed = priceSui.trim();
+    const priceNumber = Number(trimmed);
+    if (!trimmed || !Number.isFinite(priceNumber) || priceNumber <= 0) {
+      setState("error");
+      setErrorMessage("Enter a price greater than 0 SUI.");
+      return;
+    }
+
+    let priceMist: string;
+    try {
+      const [whole, frac = ""] = trimmed.split(".");
+      const padded = (frac + "000000000").slice(0, 9);
+      priceMist = (
+        BigInt(whole || "0") * BigInt("1000000000") + BigInt(padded || "0")
+      ).toString();
+    } catch {
+      setState("error");
+      setErrorMessage("Invalid price.");
+      return;
+    }
+
+    setState("signing");
+    setErrorMessage("");
+
+    try {
+      const transaction = buildListOwnedPassTransaction({
+        passId: asset.passId,
+        priceMist,
+      });
+      const txResult = await signAndExecute.mutateAsync({ transaction });
+      setState("confirming");
+
+      const finalized = await suiClient.waitForTransaction({
+        digest: txResult.digest,
+        options: { showEvents: true, showObjectChanges: true },
+      });
+
+      const listingCreated = getListingCreatedEvent(finalized);
+      const listingChange = getCreatedListingChange(finalized);
+      const listingId =
+        listingCreated?.listing_id ||
+        (typeof listingChange?.objectId === "string" ? listingChange.objectId : "");
+      const listingInitialSharedVersion = getInitialSharedVersionFromChange(listingChange);
+
+      if (listingId) {
+        // Best-effort sync to the local indexer so dev refreshes pick up the
+        // new listing before the 30s chain-index cache TTL expires. On prod
+        // (read-only FS) this is a no-op; chain index catches up on its own.
+        await fetch("/api/index-listing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sellerAddress: account.address,
+            title: asset.title,
+            description: asset.description,
+            category: asset.category,
+            priceMist,
+            assetFilename: asset.assetFilename,
+            storageSource: asset.source === "local" ? "local" : "walrus",
+            passId: asset.passId,
+            listingId,
+            listingInitialSharedVersion,
+            blobObjectId: asset.blobObjectId,
+            fileHash: asset.fileHash,
+            storageStartEpoch: asset.storageStartEpoch,
+            storageEndEpoch: asset.storageEndEpoch,
+            storageEpochDurationDays: asset.storageEpochDurationDays,
+            originalUploader: asset.originalUploader,
+            royaltyBps: asset.royaltyBps,
+            totalSupply: asset.editionTotal,
+            passesMinted: asset.editionsMinted,
+            transactionDigest: txResult.digest,
+            fields: {
+              title: asset.title,
+              description: asset.description,
+              file_size: asset.fileSize,
+              file_type: asset.fileType,
+              preview_image_url: asset.previewImageUrl,
+              walrus_blob_id: asset.walrusBlobId,
+            },
+          }),
+        }).catch(() => null);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
+        queryClient.invalidateQueries({ queryKey: ["marketplace"] }),
+      ]);
+
+      setState("listed");
+    } catch (error) {
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Listing transaction failed.");
+    }
+  }
+
+  return { list, state, errorMessage };
+}
+
 function EditionChip({
   item,
 }: {
@@ -285,18 +404,20 @@ export function ListingCard({ item, priority = false }: { item: MarketplaceListi
   return (
     <article className="surface surface-interactive flex flex-col bg-[var(--paper)]">
       <PreviewImage heightClass="h-48" item={item} priority={priority} />
-      <div className="flex flex-1 flex-col gap-4 p-5">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="mono text-[15px] font-medium leading-tight tracking-[0.02em]">
-            {item.title}
+          <h3 className="mono min-w-0 flex-1 break-words text-[15px] font-medium leading-tight tracking-[0.02em]">
+            <Link className="hover:underline" href={`/asset/${item.passId}`}>
+              {item.title}
+            </Link>
           </h3>
           {item.verified ? <VerifiedBadge /> : null}
         </div>
-        <p className="mono min-h-[3rem] text-[12px] leading-6 text-[var(--ink-60)]">
+        <p className="mono min-h-[3rem] break-words text-[12px] leading-6 text-[var(--ink-60)]">
           {item.description}
         </p>
-        <div className="mono flex items-center justify-between text-[11px] tracking-[0.04em] text-[var(--ink-60)]">
-          <span>@{item.seller.replace(/^@/, "")}</span>
+        <div className="mono flex min-w-0 items-center justify-between gap-3 text-[11px] tracking-[0.04em] text-[var(--ink-60)]">
+          <span className="min-w-0 truncate">@{item.seller.replace(/^@/, "")}</span>
           <span>{item.date}</span>
         </div>
         <div className="flex items-center justify-between gap-3">
@@ -346,9 +467,9 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
     state === "buying" || state === "owned" || !account?.address || item.soldOut;
 
   return (
-    <article className="surface surface-interactive grid gap-0 bg-[var(--paper)] md:grid-cols-[280px_1fr]">
+    <article className="surface surface-interactive grid gap-0 bg-[var(--paper)] md:grid-cols-[280px_minmax(0,1fr)]">
       <PreviewImage heightClass="min-h-64 md:min-h-full" item={item} priority />
-      <div className="flex flex-col justify-between gap-6 p-7">
+      <div className="flex min-w-0 flex-col justify-between gap-6 p-7">
         <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
             <span className="tag" style={{ background: "var(--ink)", color: "var(--paper)", borderColor: "var(--ink)" }}>
@@ -358,8 +479,12 @@ export function FeatureListing({ item }: { item: MarketplaceListing }) {
             {item.verified ? <VerifiedBadge /> : null}
             <EditionChip item={item} />
           </div>
-          <h2 className="display text-[clamp(20px,5vw,40px)]">{item.title}</h2>
-          <p className="mono text-[13px] leading-7 text-[var(--ink-60)]">
+          <h2 className="display break-words text-[clamp(20px,5vw,40px)]">
+            <Link className="hover:underline" href={`/asset/${item.passId}`}>
+              {item.title}
+            </Link>
+          </h2>
+          <p className="mono break-words text-[13px] leading-7 text-[var(--ink-60)]">
             {item.description}
           </p>
           <div className="grid grid-cols-3 divide-x divide-[var(--ink-16)] border-y border-[var(--ink-16)] py-4">
@@ -412,8 +537,11 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
   const listedByUser = asset.status === "Your Listing";
   const topUp = useStorageTopUp(asset);
   const delist = useDelist(asset);
+  const listOwned = useListOwned(asset);
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "error">("idle");
   const [downloadError, setDownloadError] = useState("");
+  const [listFormOpen, setListFormOpen] = useState(false);
+  const [listPrice, setListPrice] = useState("");
 
   const storageTone =
     asset.storageHealth === "expired"
@@ -437,13 +565,18 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
           [ {asset.status.toUpperCase()} ]
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-4 p-5">
-        <div>
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-5">
+        <div className="min-w-0">
           <div className="mono text-[10px] tracking-[0.18em] text-[var(--signal-deep)]">
             {asset.category.toUpperCase()}
           </div>
           <h3 className="mono mt-1 flex items-center gap-2 text-[16px] font-medium leading-tight">
-            {asset.title}
+            <Link
+              className="min-w-0 flex-1 break-words hover:underline"
+              href={`/asset/${asset.passId}`}
+            >
+              {asset.title}
+            </Link>
             {asset.verified ? <VerifiedBadge label="VRF" /> : null}
           </h3>
         </div>
@@ -572,6 +705,71 @@ export function LibraryCard({ asset }: { asset: LibraryAssetView }) {
             [ {asset.action.toUpperCase()} ]
           </a>
         )}
+        {owned ? (
+          <div className="border border-[var(--ink-16)] p-3">
+            {!listFormOpen ? (
+              <button
+                className="button-secondary w-full"
+                onClick={() => setListFormOpen(true)}
+                type="button"
+              >
+                [ LIST FOR SALE ]
+              </button>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="mono flex items-center justify-between text-[11px] tracking-[0.12em] text-[var(--ink-60)]">
+                  <span>SET LIST PRICE</span>
+                  <button
+                    className="mono text-[10px] tracking-[0.18em] text-[var(--ink-40)] hover:text-[var(--ink)]"
+                    onClick={() => {
+                      setListFormOpen(false);
+                      setListPrice("");
+                    }}
+                    type="button"
+                  >
+                    [ CANCEL ]
+                  </button>
+                </div>
+                <div className="flex items-stretch gap-2">
+                  <input
+                    aria-label="Price in SUI"
+                    className="mono flex-1 border border-[var(--ink-16)] bg-transparent px-3 py-2 text-[13px] tabular-nums outline-none focus:border-[var(--ink)]"
+                    inputMode="decimal"
+                    onChange={(event) => setListPrice(event.target.value)}
+                    placeholder="0.00"
+                    type="text"
+                    value={listPrice}
+                  />
+                  <span className="mono flex items-center px-2 text-[11px] tracking-[0.18em] text-[var(--ink-40)]">
+                    SUI
+                  </span>
+                </div>
+                <button
+                  className="button-primary w-full"
+                  disabled={
+                    listOwned.state === "signing" ||
+                    listOwned.state === "confirming" ||
+                    listOwned.state === "listed" ||
+                    !listPrice
+                  }
+                  onClick={() => void listOwned.list(listPrice)}
+                  type="button"
+                >
+                  {listOwned.state === "signing"
+                    ? "[ SIGN ]"
+                    : listOwned.state === "confirming"
+                      ? "[ ... ]"
+                      : listOwned.state === "listed"
+                        ? "[ LISTED ]"
+                        : "[ CONFIRM LISTING ]"}
+                </button>
+                {listOwned.errorMessage ? (
+                  <p className="mono text-[11px] text-[#c0392b]">{listOwned.errorMessage}</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
         {downloadError ? (
           <p className="mono text-[11px] text-[#c0392b]">{downloadError}</p>
         ) : null}

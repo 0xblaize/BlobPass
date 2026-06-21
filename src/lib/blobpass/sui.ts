@@ -229,6 +229,21 @@ export function buildDelistListingTransaction(input: {
   return tx;
 }
 
+export function buildListOwnedPassTransaction(input: {
+  passId: string;
+  priceMist: string;
+}) {
+  const { packageId } = assertConfig();
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${packageId}::access_pass::list_owned_pass`,
+    arguments: [tx.object(input.passId), tx.pure.u64(input.priceMist)],
+  });
+
+  return tx;
+}
+
 export function buildMintAccessPointerTransaction(input: {
   fileHashBytes: number[];
   royaltyMist: string;

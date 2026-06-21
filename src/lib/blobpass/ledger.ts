@@ -157,6 +157,7 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
     listingInitialSharedVersion: pass.listingInitialSharedVersion,
     blobObjectId: pass.blobObjectId,
     title: fields.title,
+    description: fields.description,
     category: pass.category,
     status: owned ? "Owned" : listedByUser ? "Your Listing" : "Locked",
     action: owned ? "Download" : listedByUser ? "View Listing" : "Locked",
@@ -171,6 +172,11 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
     previewImageUrl: fields.preview_image_url,
     source: pass.source,
     fileHash: pass.fileHash,
+    fileSize: fields.file_size,
+    fileType: fields.file_type,
+    assetFilename: pass.assetFilename,
+    walrusBlobId: fields.walrus_blob_id,
+    originalUploader: pass.originalUploader,
     storageStartEpoch: pass.storageStartEpoch,
     storageEndEpoch: pass.storageEndEpoch,
     storageEpochDurationDays: pass.storageEpochDurationDays,
@@ -198,7 +204,18 @@ function mapPassToLibraryAsset(pass: DataAccessPassObject, address: string): Lib
 
 export async function getMarketplaceListings() {
   const passes = await listRegistryMarketplacePasses();
-  return passes.map(mapPassToMarketplaceListing);
+
+  return passes
+    .map(mapPassToMarketplaceListing)
+    .filter((listing) => {
+      // A pass can be "listed: true" on chain (the seller never delisted) but
+      // still have every edition minted — clicking buy then triggers Move
+      // abort 7 (EEditionSoldOut). Hide those so the catalog only shows
+      // listings the buyer can actually fulfil.
+      if (listing.soldOut) return false;
+      if (listing.editionsRemaining <= 0) return false;
+      return true;
+    });
 }
 
 export async function getLibraryAssets(address = "") {

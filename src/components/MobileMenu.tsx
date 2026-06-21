@@ -45,10 +45,15 @@ export function MobileMenu({
   }, [open]);
 
   const inverted = variant === "landing";
-  const panelBg = inverted ? "var(--ink)" : "var(--paper)";
-  const panelText = inverted ? "var(--paper)" : "var(--ink)";
-  const panelBorder = inverted ? "var(--paper-16)" : "var(--ink-16)";
-  const mutedText = inverted ? "var(--paper-60)" : "var(--ink-60)";
+  // Toggle stays in the header's color so it blends with the header strip.
+  const headerText = inverted ? "var(--paper)" : "var(--ink)";
+  const headerBorder = inverted ? "var(--paper-40)" : "var(--ink-40)";
+  // Panel INVERTS the header's zone so the drop is visibly distinct
+  // (dark menu over light page, light menu over dark page).
+  const panelBg = inverted ? "var(--paper)" : "var(--ink)";
+  const panelText = inverted ? "var(--ink)" : "var(--paper)";
+  const panelBorder = inverted ? "var(--ink-16)" : "var(--paper-16)";
+  const mutedText = inverted ? "var(--ink-60)" : "var(--paper-60)";
 
   return (
     <>
@@ -58,8 +63,8 @@ export function MobileMenu({
         className="mono inline-flex h-10 items-center justify-center border px-3 text-[12px] tracking-[0.16em] md:hidden"
         onClick={() => setOpen((value) => !value)}
         style={{
-          borderColor: inverted ? "var(--paper-40)" : "var(--ink-40)",
-          color: panelText,
+          borderColor: headerBorder,
+          color: headerText,
         }}
         type="button"
       >
@@ -68,11 +73,17 @@ export function MobileMenu({
 
       {open ? (
         <div
-          className="fixed inset-x-0 top-14 z-40 md:hidden"
-          style={{ background: panelBg, color: panelText }}
+          className={`fixed inset-x-0 top-14 z-40 md:hidden ${
+            inverted ? "zone-paper" : "zone-ink"
+          }`}
+          style={{
+            background: panelBg,
+            color: panelText,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
+          }}
         >
           <div
-            className="border-b"
+            className="border-b border-t"
             style={{ borderColor: panelBorder }}
           >
             <nav className="shell flex flex-col py-6">

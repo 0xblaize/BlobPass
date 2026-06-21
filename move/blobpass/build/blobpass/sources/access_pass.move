@@ -505,4 +505,37 @@ module blobpass::access_pass {
 
         transfer::public_transfer(pass, seller);
     }
+
+    // Re-list a DataAccessPass the caller already owns. Works for both
+    // original passes (after a delist) and pointer passes acquired via
+    // mint_access_pointer — any holder can put their pass back on sale.
+    public entry fun list_owned_pass(
+        pass: DataAccessPass,
+        price: u64,
+        ctx: &mut TxContext
+    ) {
+        let seller = tx_context::sender(ctx);
+        let pass_id = object::uid_to_inner(&pass.id);
+        let listing_uid = object::new(ctx);
+        let listing_id = object::uid_to_inner(&listing_uid);
+
+        event::emit(ListingCreated {
+            listing_id,
+            pass_id,
+            seller,
+            price,
+            title: pass.title,
+            description: pass.description,
+            file_size: pass.file_size,
+            file_type: pass.file_type,
+            preview_image_url: pass.preview_image_url,
+        });
+
+        transfer::share_object(Listing {
+            id: listing_uid,
+            seller,
+            price,
+            pass: option::some(pass),
+        });
+    }
 }

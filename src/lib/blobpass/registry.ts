@@ -36,6 +36,30 @@ type CreateRegistryListingInput = {
 
 const REGISTRY_DIR = path.join(process.cwd(), ".blobpass");
 const REGISTRY_FILE = path.join(REGISTRY_DIR, "registry.json");
+
+// Vercel/serverless hosts mount the deployment as read-only, so any mkdir or
+// writeFile against process.cwd() throws ENOENT/EACCES/EROFS at request time
+// and blows up the API route. When we detect a read-only host, we skip the
+// local overlay entirely — reads degrade to the on-chain projection, writes
+// become no-ops, and the caller still gets a sensible value back.
+function isReadOnlyFilesystem() {
+  if (process.env.BLOBPASS_REGISTRY_DISABLED === "1") return true;
+  // Vercel sets both VERCEL=1 and AWS_LAMBDA_FUNCTION_NAME on serverless invocations.
+  if (process.env.VERCEL === "1" || process.env.VERCEL === "true") return true;
+  if (process.env.AWS_LAMBDA_FUNCTION_NAME) return true;
+  return false;
+}
+
+function isFilesystemError(error: unknown) {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return (
+    code === "ENOENT" ||
+    code === "ENOTDIR" ||
+    code === "EACCES" ||
+    code === "EPERM" ||
+    code === "EROFS"
+  );
+}
 const DEFAULT_GRADIENTS = [
   "from-cyan-900 via-blue-900 to-zinc-950",
   "from-blue-950 via-slate-900 to-cyan-950",
@@ -159,6 +183,10 @@ async function ensureRegistryDir() {
 }
 
 async function readRegistry(): Promise<RegistryState> {
+  if (isReadOnlyFilesystem()) {
+    return createEmptyRegistry();
+  }
+
   try {
     const raw = await readFile(REGISTRY_FILE, "utf8");
     const parsed = JSON.parse(raw) as Partial<RegistryState>;
@@ -169,15 +197,7 @@ async function readRegistry(): Promise<RegistryState> {
       passes: Array.isArray(parsed.passes) ? parsed.passes.map(normalizePassRecord) : [],
     };
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-
-    if (
-      code === "ENOENT" ||
-      code === "ENOTDIR" ||
-      code === "EACCES" ||
-      code === "EPERM" ||
-      code === "EROFS"
-    ) {
+    if (isFilesystemError(error)) {
       return createEmptyRegistry();
     }
 
@@ -186,8 +206,23 @@ async function readRegistry(): Promise<RegistryState> {
 }
 
 async function writeRegistry(state: RegistryState) {
-  await ensureRegistryDir();
-  await writeFile(REGISTRY_FILE, JSON.stringify(state, null, 2), "utf8");
+  if (isReadOnlyFilesystem()) {
+    return;
+  }
+
+  try {
+    await ensureRegistryDir();
+    await writeFile(REGISTRY_FILE, JSON.stringify(state, null, 2), "utf8");
+  } catch (error) {
+    // Belt-and-braces: if we somehow land on a host the env check didn't
+    // recognise but the FS still rejects the write, swallow it. Chain state
+    // is the source of truth; the local file is just a dev-time cache.
+    if (isFilesystemError(error)) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 async function withRegistryWrite<T>(update: (state: RegistryState) => T | Promise<T>) {
